@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Run the project scripts by hand with a Python that is new enough (3.11+, for TOML).
+#
+#   ./gl check                 test every news/job source
+#   ./gl brief                 print today's morning data (nothing marked as seen)
+#   ./gl jobs [--rings 0,1]    print new jobs (nothing marked as seen)
+#   ./gl deadlines [--all]     print today's reminders
+#   ./gl ctl ...               glctl.py: work log, job ratings, deadlines (see ./gl ctl -h)
+#   ./gl test                  run the offline tests
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+
+find_python() {  # $1 = minimum minor version of Python 3
+  local candidate
+  for candidate in "${GL_PYTHON:-}" python3.14 python3.13 python3.12 python3.11 \
+      "$HOME/.hermes/hermes-agent/venv/bin/python" "$HOME/.hermes/hermes-agent/.venv/bin/python" python3; do
+    [[ -n "$candidate" ]] || continue
+    if command -v "$candidate" >/dev/null 2>&1 &&
+       "$candidate" -c "import sys; sys.exit(0 if sys.version_info >= (3, $1) else 1)" 2>/dev/null; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+cmd="${1:-help}"
+shift || true
+# glctl only needs 3.9 (except `deadline list`); everything else reads TOML and needs 3.11.
+[[ "$cmd" == ctl ]] && MIN=9 || MIN=11
+PY="$(find_python "$MIN")" || {
+  echo "Need Python 3.$MIN or newer. Install one with:  brew install python@3.12" >&2
+  echo "(or point GL_PYTHON at one, e.g. GL_PYTHON=/opt/homebrew/bin/python3.12 ./gl check)" >&2
+  exit 1
+}
+
+case "$cmd" in
+  check)     exec "$PY" "$HERE/scripts/check_sources.py" "$@" ;;
+  brief)     exec "$PY" "$HERE/scripts/morning_brief.py" --dry-run "$@" ;;
+  jobs)      exec "$PY" "$HERE/scripts/job_scan.py" --dry-run "$@" ;;
+  deadlines) exec "$PY" "$HERE/scripts/deadlines.py" --dry-run "$@" ;;
+  ctl)       exec "$PY" "$HERE/scripts/glctl.py" "$@" ;;
+  test)      exec "$PY" -m unittest discover -s "$HERE/tests" -v ;;
+  *)         sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//' ;;
+esac

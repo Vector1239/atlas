@@ -1,0 +1,7 @@
+# personal data and run state
+/profile.md
+/data/
+/state/
+__pycache__/
+*.pyc
+.DS_Store

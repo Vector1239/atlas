@@ -1,0 +1,192 @@
+# Germany-life sources. Edit freely; the scripts reread this file on every run.
+#
+# Rings: 0 = Trier, 1 = region (Luxembourg, Saarland, Rhineland-Palatinate),
+#        2 = Germany, 3 = Europe.
+#
+# These sources could not be tested when this file was written. Run `./gl check`
+# once on your Mac, then fix or delete (or set enabled = false on) anything that fails.
+
+[home]
+city = "Trier"
+lat = 49.7499
+lon = 6.6371
+# Uni Trier, Campus I (Tarforst), used to find the nearest Mensa on OpenMensa.
+uni_lat = 49.7466
+uni_lon = 6.6873
+timezone = "Europe/Berlin"
+
+[brief]
+news_hours = 30          # how far back to look (72 h on Mondays)
+max_per_feed = 6
+mensa_radius_km = 6
+mensa_max = 2            # how many canteens to show
+mensa_name_filter = ""   # e.g. "Tarforst" to show only that one
+
+# ------------------------------------------------------------------ news
+# Google News searches are the backbone: one URL format, any place or topic.
+# `lang` is the language of the headlines; the agent translates German ones.
+
+[[news]]
+name = "Google News: Trier"
+ring = 0
+lang = "de"
+url = "https://news.google.com/rss/search?q=Trier+when:2d&hl=de&gl=DE&ceid=DE:de"
+
+[[news]]
+name = "Google News: Universität Trier"
+ring = 0
+lang = "de"
+url = "https://news.google.com/rss/search?q=%22Universit%C3%A4t+Trier%22+when:7d&hl=de&gl=DE&ceid=DE:de"
+
+[[news]]
+name = "16vor (Trier local news)"
+ring = 0
+lang = "de"
+url = "https://www.16vor.de/feed/"
+
+[[news]]
+name = "Trierischer Volksfreund"
+ring = 0
+lang = "de"
+url = "https://www.volksfreund.de/feed.rss"
+
+[[news]]
+name = "r/Trier"
+ring = 0
+lang = "de"
+url = "https://www.reddit.com/r/Trier/.rss"
+
+[[news]]
+name = "Google News: Luxembourg (English)"
+ring = 1
+lang = "en"
+url = "https://news.google.com/rss/search?q=Luxembourg+when:1d&hl=en-GB&gl=GB&ceid=GB:en"
+
+[[news]]
+name = "Google News: Rheinland-Pfalz & Saarland"
+ring = 1
+lang = "de"
+url = "https://news.google.com/rss/search?q=%28Rheinland-Pfalz+OR+Saarland%29+when:1d&hl=de&gl=DE&ceid=DE:de"
+
+[[news]]
+name = "Tagesschau"
+ring = 2
+lang = "de"
+url = "https://www.tagesschau.de/index~rss2.xml"
+
+[[news]]
+name = "DW: Germany (English)"
+ring = 2
+lang = "en"
+url = "https://rss.dw.com/rdf/rss-en-ger"
+
+[[news]]
+name = "Google News: rules for internationals in Germany"
+ring = 2
+lang = "en"
+url = "https://news.google.com/rss/search?q=Germany+%28%22Blue+Card%22+OR+visa+OR+%22residence+permit%22+OR+%22international+students%22%29+when:7d&hl=en-GB&gl=GB&ceid=GB:en"
+
+[[news]]
+name = "Google News: data & AI jobs Germany"
+ring = 2
+lang = "en"
+url = "https://news.google.com/rss/search?q=Germany+%28%22data+science%22+OR+%22AI%22%29+jobs+when:3d&hl=en-GB&gl=GB&ceid=GB:en"
+
+[[news]]
+name = "DW: Europe (English)"
+ring = 3
+lang = "en"
+url = "https://rss.dw.com/rdf/rss-en-eu"
+
+[[news]]
+name = "Politico Europe"
+ring = 3
+lang = "en"
+url = "https://www.politico.eu/feed/"
+
+# ------------------------------------------------------------------ jobs
+
+[jobs]
+max_age_days = 14            # ignore older postings
+max_items_per_run = 30       # cap what the agent sees per run
+exclude_temp_agencies = true # Bundesagentur: drop Zeitarbeit postings
+
+# A job is kept only if its title (or category/tags) matches one of these
+# (case-insensitive regular expressions).
+include = [
+  '\bdata\b', 'daten(?!schutz)', 'machine learning', '\bml\b', '\bai\b', '\bki\b',
+  'künstliche intelligenz', 'analy', 'statisti', 'python', 'business intelligence',
+  '\bbi\b', '\bnlp\b', 'deep learning', '\bllm', 'computer vision', 'forecast',
+  'data scien', 'data engineer', 'hilfskraft', '\bhiwi\b', 'research assistant',
+]
+# ...and dropped if its title matches one of these.
+exclude = [
+  'ausbildung', 'pflege', 'fahrer', 'lager', 'verkäuf', 'kassier', 'reinigung',
+  'datenschutz', 'erfassung',
+]
+student = ['werkstudent', 'working student', 'studentische', 'hilfskraft', '\bhiwi\b',
+           'praktik', '\bintern', 'thesis', 'abschlussarbeit', 'masterarbeit']
+senior = ['senior', '\blead\b', 'principal', 'head of', 'leiter', 'director', '\bstaff\b']
+german_required = ['fließend deutsch', 'verhandlungssicher', 'deutsch.{0,20}\b(c1|c2)\b',
+                   'sehr gute deutschkenntnisse', 'fluent german', 'native german',
+                   'german.{0,20}\b(c1|c2)\b', 'deutsch als muttersprache']
+
+# City names that put a job into ring 0 or 1 (for sources without a radius search).
+ring0_places = ["Trier", "Konz", "Schweich", "Saarburg", "Bitburg", "Wittlich", "Hermeskeil"]
+ring1_places = ["Luxembourg", "Luxemburg", "Esch", "Kirchberg", "Saarbrücken", "Saarlouis",
+                "Homburg", "Merzig", "Kaiserslautern", "Koblenz", "Mainz", "Idar-Oberstein",
+                "Wiesbaden", "Ludwigshafen", "Mannheim"]
+
+# Bundesagentur für Arbeit (official German job board, free, no sign-up).
+[[jobs.bundesagentur]]
+ring = 0
+where = "Trier"
+radius_km = 50
+queries = ["Data Science", "Data Analyst", "Machine Learning", "Werkstudent Data",
+           "Werkstudent Informatik", "Python", "Business Intelligence", "Statistik",
+           "Wissenschaftliche Hilfskraft"]
+
+[[jobs.bundesagentur]]
+ring = 1
+where = "Trier"
+radius_km = 150
+queries = ["Data Scientist", "Data Analyst", "Machine Learning", "Werkstudent Data Science",
+           "Data Engineer"]
+
+[[jobs.bundesagentur]]
+ring = 2
+where = ""   # all of Germany
+queries = ["Junior Data Scientist", "Werkstudent Data Science", "Junior Data Analyst",
+           "Junior Machine Learning Engineer", "Graduate Data Scientist"]
+
+# Arbeitnow (Germany-focused board with a visa-sponsorship filter; free, no key).
+# Rings come from ring0_places / ring1_places; everything else is ring 2.
+[jobs.arbeitnow]
+enabled = true
+pages = 3          # general listings, ~100 per page
+visa_pages = 2     # extra pages from the visa-sponsorship feed
+
+# Adzuna (optional): free key from https://developer.adzuna.com. Put ADZUNA_APP_ID and
+# ADZUNA_APP_KEY in ~/.hermes/.env and list both under terminal.env_passthrough in
+# ~/.hermes/config.yaml (see SETUP-macOS.md). Skipped without a key.
+[[jobs.adzuna]]
+ring = 1
+country = "de"
+what = "data"
+where = "Trier"
+radius_km = 150
+
+[[jobs.adzuna]]
+ring = 3
+country = "nl"
+what = "junior data scientist"
+
+[[jobs.adzuna]]
+ring = 3
+country = "at"
+what = "junior data scientist"
+
+[[jobs.adzuna]]
+ring = 3
+country = "be"
+what = "junior data scientist"

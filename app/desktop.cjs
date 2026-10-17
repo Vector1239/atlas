@@ -1,0 +1,66 @@
+const { app, BrowserWindow, Menu, dialog, shell, session } = require('electron');
+const { spawn } = require('node:child_process');
+const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
+
+app.setName('Atlas');
+let backend, window, baseURL, exiting = false;
+const project = process.env.ATLAS_PROJECT || path.join(os.homedir(), 'Projects/Atlas/germany-life-hermes');
+const python = process.env.ATLAS_PYTHON || '/opt/homebrew/bin/python3.12';
+
+if (!app.requestSingleInstanceLock()) app.quit();
+app.on('second-instance', () => { if (window) { if (window.isMinimized()) window.restore(); window.show(); window.focus(); } });
+
+function external(url) {
+  try { if (['https:', 'http:'].includes(new URL(url).protocol)) shell.openExternal(url); } catch {}
+}
+function createWindow(url) {
+  baseURL = new URL(url).origin;
+  window = new BrowserWindow({ title: 'Atlas', width: 1320, height: 900, minWidth: 720, minHeight: 600,
+    backgroundColor: '#fbfbfa', titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 19, y: 18 },
+    icon: path.join(__dirname, 'assets/Atlas.png'), show: false,
+    webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true } });
+  window.webContents.setWindowOpenHandler(({ url }) => { external(url); return { action: 'deny' }; });
+  window.webContents.on('will-navigate', (event, next) => {
+    if (new URL(next).origin !== baseURL) { event.preventDefault(); external(next); }
+  });
+  window.once('ready-to-show', () => window.show());
+  window.loadURL(url);
+  window.on('closed', () => { window = null; });
+}
+
+app.whenReady().then(() => {
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    { label: 'Atlas', submenu: [{ role: 'about', label: 'About Atlas' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }] },
+    { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' }
+  ]));
+  session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+  session.defaultSession.setPermissionCheckHandler(() => false);
+  if (!fs.existsSync(project) || !fs.existsSync(python)) {
+    dialog.showErrorBox('Atlas needs its local files', `The Atlas project or Python runtime could not be found.\nProject: ${project}\nPython: ${python}`);
+    app.quit(); return;
+  }
+  const logs = path.join(project, 'state'); fs.mkdirSync(logs, { recursive: true });
+  const log = fs.openSync(path.join(logs, 'atlas-app.log'), 'a');
+  backend = spawn(python, ['-u', path.join(__dirname, 'backend.py')], {
+    cwd: project, env: { ...process.env, ATLAS_PROJECT: project, PYTHONUNBUFFERED: '1', PATH: `/opt/homebrew/bin:${os.homedir()}/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin` },
+    stdio: ['ignore', 'pipe', log]
+  });
+  fs.closeSync(log);
+  let buffer = '', started = false;
+  const timer = setTimeout(() => { if (!started) { dialog.showErrorBox('Atlas could not open', 'The local app service did not start. Details are in the project’s state/atlas-app.log file.'); app.quit(); } }, 30000);
+  backend.stdout.on('data', chunk => {
+    buffer += chunk;
+    let lineEnd;
+    while ((lineEnd = buffer.indexOf('\n')) >= 0) {
+      const line = buffer.slice(0, lineEnd); buffer = buffer.slice(lineEnd + 1);
+      try { const data = JSON.parse(line); if (data.url && !started) { started = true; clearTimeout(timer); createWindow(data.url); } } catch {}
+    }
+  });
+  backend.on('error', error => { clearTimeout(timer); dialog.showErrorBox('Atlas could not start', error.message); app.quit(); });
+  backend.on('exit', code => { if (!exiting && code !== 0) { dialog.showErrorBox('Atlas stopped unexpectedly', 'Please reopen Atlas. Your data is saved locally.'); app.quit(); } });
+});
+
+app.on('window-all-closed', () => app.quit());
+app.on('before-quit', () => { exiting = true; if (backend && backend.exitCode === null) backend.kill('SIGTERM'); });

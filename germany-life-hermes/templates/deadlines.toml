@@ -1,0 +1,37 @@
+# Your deadlines. scripts/deadlines.py sends a Telegram reminder on each day listed in
+# remind_days (days before the date) and for 3 days after it.
+#
+# The entries below are EXAMPLES with made-up dates (example = true makes the scripts
+# ignore them). Put in your real dates, then delete the `example = true` line.
+# You can also ask Hermes: "remind me on 3 Dec to pay the Rundfunkbeitrag".
+
+[[deadline]]
+title = "Residence permit expires: book the Ausländerbehörde Trier appointment now"
+date = 2027-09-30
+category = "visa"
+remind_days = [120, 90, 60, 30, 14, 7, 1]
+note = "Appointments can take weeks. Bring passport, enrolment certificate, proof of finances and health insurance."
+example = true
+
+[[deadline]]
+title = "Rückmeldung: pay the semester fee for next semester"
+date = 2027-01-31
+category = "uni"
+remind_days = [21, 7, 2]
+note = "Check the exact period on the Uni Trier website."
+example = true
+
+[[deadline]]
+title = "Exam registration closes"
+date = 2026-12-15
+category = "uni"
+remind_days = [14, 3, 1]
+example = true
+
+[[deadline]]
+title = "Tax return (Steuererklärung) for last year, if you had a Werkstudent job"
+date = 2027-07-31
+category = "money"
+remind_days = [60, 14]
+note = "Students with job income often get tax back. ELSTER is free."
+example = true

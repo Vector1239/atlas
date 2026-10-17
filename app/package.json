@@ -1,0 +1,25 @@
+{
+  "name": "atlas-local",
+  "version": "1.0.0",
+  "description": "Your local life assistant, powered by Hermes and Qwen",
+  "private": true,
+  "type": "module",
+  "main": "desktop.cjs",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "start": "electron .",
+    "package": "electron-packager . Atlas --platform=darwin --arch=arm64 --out=release --overwrite --no-asar --app-bundle-id=local.atlas.assistant --icon=assets/Atlas.icns --ignore=release --ignore=tests --ignore=src --ignore=package-lock.json --ignore=render-icon.cjs"
+  },
+  "dependencies": {
+    "@phosphor-icons/react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-markdown": "latest"
+  },
+  "devDependencies": {
+    "@electron/packager": "latest",
+    "electron": "latest",
+    "vite": "latest"
+  }
+}

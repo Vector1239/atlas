@@ -1,0 +1,43 @@
+# Dependencies and generated app bundles
+node_modules/
+/app/release/
+/app/dist/
+*.app/
+*.iconset/
+
+# Python environments and generated caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Personal profile, chats, work logs, deadlines, source caches and launch tokens
+/germany-life-hermes/profile.md
+/germany-life-hermes/data/
+/germany-life-hermes/state/
+
+# Credentials and local model downloads
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.gguf
+*.safetensors
+
+# Runtime and operating-system files
+*.log
+*.pid
+*.sock
+.DS_Store
+._*
+Thumbs.db
+desktop.ini
