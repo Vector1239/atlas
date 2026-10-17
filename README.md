@@ -11,6 +11,8 @@ Atlas brings your existing Germany-life project and Hermes Agent into one local 
 - **Ask Atlas:** a persistent Hermes conversation powered by local Qwen.
 - **Settings:** edit your profile, change reasoning effort, start or stop Qwen, manage routines, and check sources.
 
+The version (currently 1.1.0) is shown at the bottom of the sidebar and under **Atlas → About Atlas**. It is set in `app/package.json`; bump it there when you change the app.
+
 ## First use
 
 1. Open Atlas. Browse Jobs and Events with Qwen paused. Start it in **Settings → Local model** when you want AI features; the lower-left status changes to **Qwen is ready**.

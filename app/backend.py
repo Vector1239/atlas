@@ -37,6 +37,8 @@ import morning_brief
 sys.path.insert(0, str(Path(__file__).parent))
 import discovery
 
+# package.json is the one place the version is set; Electron's About box reads it too.
+VERSION = json.loads((Path(__file__).parent / "package.json").read_text())["version"]
 HOME = Path.home()
 HERMES = HOME / ".local/bin/hermes"
 MODEL_PATH = HOME / ".cache/Atlas/models/Qwen3.8-27B.Q4_K_M.gguf"
@@ -385,6 +387,7 @@ def public_state():
     result["schedules"] = schedules()
     result["date"] = today.isoformat()
     result["engine"] = "Hermes Agent"
+    result["version"] = VERSION
     result["busy"] = CHAT_LOCK.locked()
     return result
 
@@ -656,7 +659,7 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         if path == "/api/health":
-            return self.send_json({"ok": True, "app": "Atlas"})
+            return self.send_json({"ok": True, "app": "Atlas", "version": VERSION})
         if not self.authenticated():
             return self.send_json({"error": "Open Atlas from the app icon."}, 401)
         if path == "/api/state":
