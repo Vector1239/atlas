@@ -247,5 +247,47 @@
     "region": "Bavaria",
     "geonames_id": 2861650,
     "precision": "city"
+  },
+  "Esch-sur-Alzette": {
+    "name": "Esch-sur-Alzette",
+    "lat": 49.49583,
+    "lon": 5.98056,
+    "country": "Luxembourg",
+    "precision": "city"
+  },
+  "Heilbronn": {
+    "name": "Heilbronn",
+    "lat": 49.13995,
+    "lon": 9.22054,
+    "country": "Germany",
+    "precision": "city"
+  },
+  "Espoo": {
+    "name": "Espoo",
+    "lat": 60.2052,
+    "lon": 24.6522,
+    "country": "Finland",
+    "precision": "city"
+  },
+  "Timișoara": {
+    "name": "Timișoara",
+    "lat": 45.75372,
+    "lon": 21.22571,
+    "country": "Romania",
+    "precision": "city"
+  },
+  "Oxford": {
+    "name": "Oxford",
+    "lat": 51.75222,
+    "lon": -1.25596,
+    "country": "United Kingdom",
+    "precision": "city"
+  },
+  "Durham": {
+    "name": "Durham",
+    "lat": 54.77676,
+    "lon": -1.57566,
+    "country": "United Kingdom",
+    "precision": "city"
   }
 }

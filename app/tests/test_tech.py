@@ -48,3 +48,36 @@ class TechTests(unittest.TestCase):
             self.assertEqual(saved['events'], cached['events'])
             self.assertEqual(saved['posts'], cached['posts'])
             self.assertTrue(all(not row['ok'] for row in saved['sources']))
+
+    def test_duplicates_combine_sources_and_prefer_live_calendar_details(self):
+        row = {'title':'Build 2026','start':'2026-10-22','end':'2026-10-22','checked_at':'2026-10-17','url':'https://event.example/','source':'Directory','authority':'directory'}
+        official = {**row,'title':'Build Conference','url':'https://www.event.example/','source':'Organiser calendar','authority':'calendar','venue':'Actual room','cost':'Free'}
+        result = tech.upcoming([row,official],dt.date(2026,10,17))
+        self.assertEqual(len(result),1)
+        self.assertEqual(result[0]['cost'],'Free')
+        self.assertEqual({r['name'] for r in result[0]['listed_by']},{'Directory','Organiser calendar'})
+        self.assertEqual(tech.upcoming([row,{**official,'cancelled':True}],dt.date(2026,10,17)),[])
+
+    def test_source_failure_preserves_only_that_sources_cache(self):
+        cached = {'event_sources':{'developers.events':[{'id':'old-directory'}],'Major League Hacking':[{'id':'keep-mlh'}]},'events':[],'posts':[]}
+        def fetch(name,today):
+            if name == 'Major League Hacking':
+                raise OSError('temporarily offline')
+            return [{'id':'new-meetup'}] if name == 'Maschinendeck Trier' else []
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            (state/'tech.json').write_text(json.dumps(cached))
+            with patch.object(tech,'fetch_event_source',side_effect=fetch), patch.object(tech.gl,'http_get',side_effect=OSError('offline')):
+                tech.refresh(state,dt.date(2026,10,17))
+            saved = json.loads((state/'tech.json').read_text())
+            self.assertEqual(saved['event_sources']['Major League Hacking'],[{'id':'keep-mlh'}])
+            self.assertEqual(saved['event_sources']['developers.events'],[])
+            self.assertEqual(saved['event_sources']['Maschinendeck Trier'],[{'id':'new-meetup'}])
+
+    def test_neighbourhood_addresses_resolve_to_a_known_city_and_global_unknowns_stay_out(self):
+        rows = tech.locate_events([{'title':'Meetup','kind':'event','city':'Gare Luxembourg','country':'Luxembourg','venue':'Silversquare, Luxembourg','source':'Silicon Luxembourg calendar'}, {'title':'Hack','kind':'hackathon','city':'','country':'','venue':'Unknown international venue','source':'Devpost'}])
+        self.assertEqual(len(rows),1)
+        self.assertIsNotNone(rows[0]['location'])
+        self.assertEqual(rows[0]['country'],'Luxembourg')
+        for venue in ('London','New York, NY','University of Toronto Scarborough'):
+            self.assertEqual(tech.locate_events([{'title':'Hack','kind':'hackathon','city':'','country':'','venue':venue,'source':'Devpost'}]),[])

@@ -1,6 +1,6 @@
 import { validLocation } from './explore-filters.js';
 
-export const initialTechFilters = { kind:'all', search:'', area:'all', distance:'any', city:'all', period:'all', sort:'nearest' };
+export const initialTechFilters = { kind:'all', search:'', area:'all', distance:'any', city:'all', period:'all', source:'all', sort:'nearest' };
 export function distanceFrom(location, base) {
   if (!validLocation(location) || !validLocation(base)) return null;
   const rad = v => v * Math.PI / 180;
@@ -11,7 +11,8 @@ export function selectTech(tech, filters, home, today) {
   const cutoff = new Date(`${today}T00:00:00Z`); cutoff.setUTCDate(cutoff.getUTCDate() + Number(filters.period));
   return (tech.events || []).map(item => ({ ...item, distance: item.online ? null : distanceFrom(item.location, home) })).filter(item =>
     (item.end || item.start) >= today && (filters.kind === 'all' || filters.kind === item.kind)
-    && `${item.title} ${item.city} ${item.country} ${item.source} ${item.description || ''}`.toLowerCase().includes(filters.search.trim().toLowerCase())
+    && `${item.title} ${item.city} ${item.country} ${item.source} ${item.description || ''} ${(item.topics || []).join(' ')} ${item.organizer || ''} ${(item.listed_by || []).map(s => s.name).join(' ')}`.toLowerCase().includes(filters.search.trim().toLowerCase())
+    && (!filters.source || filters.source === 'all' || item.source === filters.source || (item.listed_by || []).some(s => s.name === filters.source))
     && (filters.area === 'all' || (filters.area === 'online' ? item.online : filters.area === 'germany' ? !item.online && item.country === 'Germany' : !item.online))
     && (filters.distance === 'any' || item.distance !== null && item.distance <= Number(filters.distance))
     && (filters.city === 'all' || item.city === filters.city)

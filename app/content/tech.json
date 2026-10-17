@@ -20,6 +20,21 @@
       "name": "Developer conferences",
       "city": "Europe & online",
       "url": "https://developers.events/"
+    },
+    {
+      "name": "Silicon Luxembourg calendar",
+      "city": "Luxembourg",
+      "url": "https://www.siliconluxembourg.lu/calendar/"
+    },
+    {
+      "name": "Major League Hacking",
+      "city": "Europe & online",
+      "url": "https://www.mlh.com/seasons/2027/events"
+    },
+    {
+      "name": "Devpost hackathons",
+      "city": "Europe & online",
+      "url": "https://devpost.com/hackathons"
     }
   ],
   "events": [

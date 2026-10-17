@@ -19,3 +19,8 @@ test('type, period and online filters combine without showing expired events', (
   assert.equal(selectTech(tech,{...initialTechFilters,kind:'hackathon',period:'7'},home,'2026-10-17').length,0);
   assert.deepEqual(selectTech(tech,{...initialTechFilters,area:'online'},home,'2026-10-17').map(r => r.id),['online']);
 });
+test('source filters match duplicate provenance and searches include topics', () => {
+  const listings = { events:[{...tech.events[0],source:'Calendar',listed_by:[{name:'MLH'},{name:'Calendar'}],topics:['Robotics']}] };
+  assert.equal(selectTech(listings,{...initialTechFilters,source:'MLH',search:'Robotics'},home,'2026-10-17').length,1);
+  assert.equal(selectTech(listings,{...initialTechFilters,source:'Devpost'},home,'2026-10-17').length,0);
+});
