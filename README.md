@@ -11,6 +11,8 @@ Atlas brings your existing Germany-life project and Hermes Agent into one local 
 - **Ask Atlas:** a persistent Hermes conversation powered by local Qwen.
 - **Settings:** edit your profile, change reasoning effort, start or stop Qwen, manage routines, and check sources.
 
+The version (currently 1.1.0) is shown at the bottom of the sidebar and under **Atlas → About Atlas**. It is set in `app/package.json`; bump it there when you change the app.
+
 ## First use
 
 1. Open Atlas. Browse Jobs and Events with Qwen paused. Start it in **Settings → Local model** when you want AI features; the lower-left status changes to **Qwen is ready**.
@@ -50,6 +52,8 @@ npm run build
 ```
 
 For a checkout outside `~/Projects/Atlas`, set `ATLAS_PROJECT` to the absolute path of its `germany-life-hermes` folder before starting the app or service. Run `npm start` from `app/` to open the desktop app, or `npm run package` to create an Apple Silicon app under `app/release/`.
+
+For live reload while editing the interface, start the service with `backend.py --port 4317` (or set `ATLAS_PORT` to match), open the launch URL it prints once so the browser gets a session, then run `npm run dev` and open `http://127.0.0.1:4173`.
 
 The service prints a local launch URL that establishes an app session. It listens only on loopback, requires a launch-session cookie for private endpoints, rejects outside origins, and exposes specific app actions. The renderer has no Node access.
 

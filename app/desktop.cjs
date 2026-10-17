@@ -9,7 +9,9 @@ let backend, window, baseURL, exiting = false;
 const project = process.env.ATLAS_PROJECT || path.join(os.homedir(), 'Projects/Atlas/germany-life-hermes');
 const python = process.env.ATLAS_PYTHON || '/opt/homebrew/bin/python3.12';
 
-if (!app.requestSingleInstanceLock()) app.quit();
+// A second launch only focuses the first window; it must not start its own backend.
+const primary = app.requestSingleInstanceLock();
+if (!primary) app.quit();
 app.on('second-instance', () => { if (window) { if (window.isMinimized()) window.restore(); window.show(); window.focus(); } });
 
 function external(url) {
@@ -31,6 +33,7 @@ function createWindow(url) {
 }
 
 app.whenReady().then(() => {
+  if (!primary) return;
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: 'Atlas', submenu: [{ role: 'about', label: 'About Atlas' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }] },
     { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' }

@@ -35,6 +35,9 @@ class DiscoveryTests(unittest.TestCase):
     def test_unseen_german_title_waits_for_actual_translation(self):
         job = {'title': 'Werkstudent für Nachhaltigkeitsforschung', 'where': 'Trier'}
         self.assertTrue(discovery.enrich_job(job)['translation_needed'])
+        for title in ('Werkstudierende (w/m/d) Controlling', 'Softwareentwickler (m/w/d)', 'Datenanalyst (m/w/d) in Teilzeit'):
+            self.assertTrue(discovery.enrich_job({'title': title})['translation_needed'], title)
+        self.assertFalse(discovery.enrich_job({'title': 'Data Scientist (m/w/d)'})['translation_needed'])
         translated = discovery.enrich_job(job, {job['title']: 'Working student in sustainability research'})
         self.assertFalse(translated['translation_needed'])
         self.assertIn('sustainability', translated['title_en'])

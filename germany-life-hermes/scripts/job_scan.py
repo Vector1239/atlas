@@ -299,12 +299,14 @@ def run(rings: set[int], dry_run: bool) -> str:
             seen[f"tc:{gl.norm(job['title'])}|{gl.norm(job['company'])}"] = today
         gl.save_json(seen_path, seen)
         index_path = gl.data_dir() / "jobs_index.json"
-        index = gl.load_json(index_path, {})
-        index = {k: v for k, v in index.items() if v.get("first_seen", today) >= cutoff}
-        for job in shown:
-            index[job["id"]] = {k: job[k] for k in ("title", "company", "where", "url", "source", "ring", "flags")}
-            index[job["id"]]["first_seen"] = today
-        gl.save_json(index_path, index)
+        with gl.file_lock(index_path):
+            index = gl.load_json(index_path, {})
+            index = {k: v for k, v in index.items() if v.get("first_seen", today) >= cutoff}
+            for job in shown:
+                first_seen = index.get(job["id"], {}).get("first_seen", today)
+                index[job["id"]] = {k: job[k] for k in ("title", "company", "where", "url", "source", "ring", "flags")}
+                index[job["id"]]["first_seen"] = first_seen
+            gl.save_json(index_path, index)
 
     # Nothing new: skip the LLM run. But if every source failed, wake the agent so
     # the failure reaches you instead of the scan going quiet.

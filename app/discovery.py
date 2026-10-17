@@ -14,7 +14,16 @@ EVENT_CATALOG = json.loads((CONTENT / "events.json").read_text())
 REGIONS = {"RHEINLAND_PFALZ": "Rhineland-Palatinate", "SAARLAND": "Saarland",
            "NORDRHEIN_WESTFALEN": "North Rhine-Westphalia", "HESSEN": "Hesse",
            "BADEN_WUERTTEMBERG": "Baden-Württemberg"}
-GERMAN_TITLE = re.compile(r"[äöüß]|\b(?:Werkstudent\w*|Duales|Studium|und|für|gesucht|Referat|Vertriebs\w*|Projektleitung|Schwerpunkt|Weiterbildungen|Umschulungsstandort|Anforderungsmanager)\b", re.I)
+# Errs towards "German": a wrongly flagged English title only waits for translation, while a
+# missed German one would be shown as if it were English.
+GERMAN_TITLE = re.compile(
+    r"[äöüß]"
+    r"|\b(?:und|für|mit|im|bei|zur|zum|der|die|das|des|als|oder|gesucht|duales|studium|referat|schwerpunkt)\b"
+    r"|werkstudi|studierende|entwickl|mitarbeit|berater|leiter|leitung|sachbearbeit|referent|ingenieur"
+    r"|informatik|kaufm|kauff|fachkraft|hilfskraft|wissenschaft|verwaltung|assistenz|betreuer|techniker"
+    r"|daten|analytiker|teilzeit|vollzeit|ausbildung|praktik|arbeit|stelle|beauftragte|vertrieb"
+    r"|anforderung|weiterbildung|standort"
+    r"|\w(?:ung|keit|heit|schaft)\b|\w(?::|\*|_)in(?:nen)?\b|\w/-?in\b", re.I)
 
 
 def clean_gender(title):
