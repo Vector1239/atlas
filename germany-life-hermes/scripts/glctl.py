@@ -77,7 +77,8 @@ def job_rate(args) -> None:
 
 
 def _toml_string(value: str) -> str:
-    return json.dumps(value, ensure_ascii=False)  # a JSON string is a valid TOML basic string
+    # A JSON string is a valid TOML basic string, except that TOML also forbids a raw DEL.
+    return json.dumps(value, ensure_ascii=False).replace("\x7f", "\\u007f")
 
 
 def deadline_add(args) -> None:

@@ -6,6 +6,7 @@ cron job fires, with nothing extra to install. TOML parsing needs Python 3.11+
 """
 from __future__ import annotations
 
+import contextlib
 import csv
 import datetime as dt
 import hashlib
@@ -99,6 +100,20 @@ def load_json(path: Path, default):
         return json.loads(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError):
         return default
+
+
+@contextlib.contextmanager
+def file_lock(path: Path):
+    """Hold an exclusive lock for a read-modify-write of `path`. The Atlas app and the
+    Hermes cron jobs are separate processes that update the same files."""
+    import fcntl
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path.with_suffix(path.suffix + ".lock"), "a") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
 
 
 def save_json(path: Path, value) -> None:

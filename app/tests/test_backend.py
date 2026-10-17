@@ -94,6 +94,20 @@ class AtlasTests(unittest.TestCase):
         self.post('/api/jobs/save', {'id': 'J-12345'})
         self.assertIn('J-12345', self.backend.public_state()['saved_jobs'])
 
+    def test_state_survives_missing_worklog_and_broken_deadlines(self):
+        data = self.project / 'data'
+        (data / 'worklog.csv').rename(data / 'worklog.bak')
+        good = (data / 'deadlines.toml').read_text()
+        (data / 'deadlines.toml').write_text(good + '\n[[deadline]]\ntitle = "x"\ndate = "2026-13-01"\n')
+        try:
+            state = self.backend.public_state()
+            self.assertEqual(state['work']['remaining'], state['work']['limit'])
+            self.assertEqual(state['deadlines'], [])
+            self.assertIn('deadlines.toml', state['deadlines_error'])
+        finally:
+            (data / 'worklog.bak').rename(data / 'worklog.csv')
+            (data / 'deadlines.toml').write_text(good)
+
     def test_unsupported_reasoning_is_rejected(self):
         with self.assertRaises(urllib.error.HTTPError):
             self.post('/api/settings', {'reasoning': 'made-up'})

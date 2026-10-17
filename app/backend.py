@@ -28,7 +28,7 @@ import uuid
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-PROJECT = Path(os.environ.get("ATLAS_PROJECT", "/Users/dhiraj/Projects/Atlas/germany-life-hermes"))
+PROJECT = Path(os.environ.get("ATLAS_PROJECT") or Path.home() / "Projects/Atlas/germany-life-hermes")
 os.environ["GERMANY_LIFE_HOME"] = str(PROJECT)
 sys.path.insert(0, str(PROJECT / "scripts"))
 import gl_common as gl
@@ -67,6 +67,9 @@ DATA.setdefault("chat", [])
 DATA.setdefault("settings", {"reasoning": "medium"})
 CACHE = gl.load_json(SNAPSHOT, {"news": [], "jobs": [], "weather": [], "mensa": [], "sources": []})
 TRANSLATIONS = gl.load_json(STATE_DIR / "job_translations.json", {})
+_CONFIG = {"mtime": None, "value": {}}
+_HEALTH = {"at": 0.0, "ok": False}
+_ENRICHED = {"source": None, "translations": -1, "jobs": []}
 
 
 def persist():
@@ -75,8 +78,19 @@ def persist():
         STORE.chmod(0o600)
 
 
+def config():
+    """sources.toml, reread only when the file changes."""
+    try:
+        mtime = (PROJECT / "config/sources.toml").stat().st_mtime
+    except FileNotFoundError:
+        mtime = None
+    if mtime != _CONFIG["mtime"]:
+        _CONFIG.update(mtime=mtime, value=gl.load_config())
+    return _CONFIG["value"]
+
+
 def iso_now():
-    return gl.now(gl.load_config()).isoformat()
+    return gl.now(config()).isoformat()
 
 
 def model_health():
@@ -93,7 +107,10 @@ def model_status():
     global MODEL_WAS_READY
     present = MODEL_PATH.exists()
     installed = present and MODEL_PATH.with_suffix(".ready").exists()
-    ready = model_health()
+    # The UI polls often; a busy model can take a while to answer /health.
+    if time.monotonic() - _HEALTH["at"] > 3:
+        _HEALTH.update(at=time.monotonic(), ok=model_health())
+    ready = _HEALTH["ok"]
     if ready:
         MODEL_WAS_READY = True
     # A busy Metal decode can delay the health handler; it is still a loaded model.
@@ -122,6 +139,7 @@ def start_model(wait=False):
                 raise ValueError("The local model runtime is missing. Reinstall llama.cpp.")
             MODEL_ERROR = ""
             MODEL_WAS_READY = False
+            _HEALTH["at"] = 0
             log = open(STATE_DIR / "qwen.log", "a")
             args = [binary, "-m", str(MODEL_PATH), "--alias", "atlas-qwen", "--host", "127.0.0.1",
                     "--port", str(MODEL_PORT), "-c", "65536", "-np", "1", "-ngl", "99",
@@ -181,6 +199,7 @@ def stop_model():
             MODEL_PROCESS = None
             MODEL_WAS_READY = False
             MODEL_ERROR = ""
+            _HEALTH["at"] = 0
     finally:
         MODEL_STOPPING.clear()
 
@@ -208,7 +227,7 @@ def valid_url(value):
 def collect_news(feed):
     items = gl.parse_feed(gl.http_get(feed["url"]))
     result = []
-    cutoff = gl.now(gl.load_config()) - dt.timedelta(days=3)
+    cutoff = gl.now(config()) - dt.timedelta(days=3)
     for item in items:
         if any(part in item.get("link", "").lower() for part in ("/boulevard/", "/sport/", "/entertainment/")):
             continue
@@ -231,7 +250,7 @@ def refresh_data():
     if not REFRESH_LOCK.acquire(blocking=False):
         return
     REFRESH_STATUS.update(running=True, error="", message="Checking your sources…")
-    cfg = gl.load_config()
+    cfg = config()
     sources, news = [], []
     try:
         feeds = [f for f in cfg.get("news", []) if f.get("enabled", True)]
@@ -285,12 +304,14 @@ def refresh_data():
         found.sort(key=job_scan.score, reverse=True)
         for line in status:
             sources.append({"name": line[2:].split(":")[0], "ok": not line.startswith("✗"), "skipped": line.startswith("·"), "detail": line[2:]})
-        with LOCK:
-            index = gl.load_json(gl.data_dir() / "jobs_index.json", {})
+        index_path = gl.data_dir() / "jobs_index.json"
+        with LOCK, gl.file_lock(index_path):
+            index = gl.load_json(index_path, {})
+            today = dt.date.today().isoformat()
             for job in found:
                 index[job["id"]] = {**{key: job[key] for key in ("title", "company", "where", "url", "source", "ring", "flags")},
-                                    "first_seen": dt.date.today().isoformat()}
-            gl.save_json(gl.data_dir() / "jobs_index.json", index)
+                                    "first_seen": index.get(job["id"], {}).get("first_seen", today)}
+            gl.save_json(index_path, index)
             if found or any(line.startswith("✓") for line in status):
                 CACHE["jobs"] = found
             CACHE.update(sources=sources, refreshed_at=iso_now())
@@ -316,22 +337,47 @@ def schedules():
             for row in rows if str(row.get("script", "")).startswith("germany_life/")]
 
 
+def deadline_rows(today):
+    """A broken deadlines.toml must not take the whole app down with it."""
+    try:
+        rows = gl.load_deadlines()
+    except Exception as exc:
+        return [], f"data/deadlines.toml could not be read ({exc}). Fix or remove the broken entry."
+    return [{**row, "date": row["date"].isoformat(), "days_left": (row["date"] - today).days} for row in rows], ""
+
+
+def work_summary(year):
+    empty = {"year": year, "full": 0, "half": 0, "used": 0, "remaining": gl.WORKDAY_LIMIT, "hiwi_days": 0}
+    return {**(gl.workdays_summary(year) or empty), "limit": gl.WORKDAY_LIMIT}
+
+
+def enriched_jobs(jobs):
+    """Enrichment only changes when the job list or the translations do."""
+    if _ENRICHED["source"] is not jobs or _ENRICHED["translations"] != len(TRANSLATIONS):
+        _ENRICHED.update(source=jobs, translations=len(TRANSLATIONS),
+                         jobs=[discovery.enrich_job(job, TRANSLATIONS) for job in jobs])
+    return _ENRICHED["jobs"]
+
+
 def public_state():
     with LOCK:
-        result = json.loads(json.dumps(CACHE))
-        result.update(chat=DATA["chat"][-100:], brief=DATA.get("brief"), settings=DATA["settings"].copy())
-    today = gl.now(gl.load_config()).date()
-    result["jobs"] = [discovery.enrich_job(job, TRANSLATIONS) for job in result.get("jobs", [])]
+        result = dict(CACHE)
+        result.update(chat=[{**row, "tools": list(row.get("tools", []))} for row in DATA["chat"][-100:]],
+                      brief=DATA.get("brief"), settings=DATA["settings"].copy(),
+                      saved_jobs=list(DATA.get("saved_jobs", [])))
+        jobs = CACHE.get("jobs", [])
+    today = gl.now(config()).date()
+    result["jobs"] = enriched_jobs(jobs)
     result["events"] = discovery.upcoming_events(today)
     result["translation"] = TRANSLATION_STATUS.copy()
-    result["job_sources"] = [{"name": name, "count": sum(j["source_label"] == name for j in result["jobs"])}
-                             for name in ("Bundesagentur für Arbeit", "Arbeitnow")]
-    result["deadlines"] = [{**row, "date": row["date"].isoformat(), "days_left": (row["date"] - today).days}
-                           for row in sorted(gl.load_deadlines(), key=lambda row: row["date"])]
-    result["work"] = gl.workdays_summary(today.year)
+    labels = ["Bundesagentur für Arbeit", "Arbeitnow"]
+    labels += sorted({job["source_label"] for job in result["jobs"]} - set(labels))
+    result["job_sources"] = [{"name": name, "count": sum(j["source_label"] == name for j in result["jobs"])} for name in labels]
+    result["adzuna_key_missing"] = any(s.get("name") == "Adzuna" and s.get("skipped") for s in result.get("sources", []))
+    result["deadlines"], result["deadlines_error"] = deadline_rows(today)
+    result["work"] = work_summary(today.year)
     result["worklog"] = list(reversed(read_csv("worklog.csv")))
     result["feedback"] = {row["job_id"]: row for row in read_csv("job_feedback.csv")}
-    result["saved_jobs"] = DATA.get("saved_jobs", [])
     result["profile"] = gl.read_profile()
     result["profile_incomplete"] = bool(re.search(r"<(?!!--)[^>\n]+>", result["profile"]))
     result["refresh"] = REFRESH_STATUS.copy()
@@ -425,9 +471,10 @@ def chat_worker(message_id, message, kind):
     try:
         start_model(wait=True)
         row["status"] = "thinking"
-        cfg = gl.load_config()
-        context = {"date": gl.now(cfg).date().isoformat(), "profile": gl.read_profile(),
-                   "deadlines": public_state()["deadlines"][:10], "work": gl.workdays_summary(gl.now(cfg).year)}
+        cfg = config()
+        today = gl.now(cfg).date()
+        context = {"date": today.isoformat(), "profile": gl.read_profile(),
+                   "deadlines": deadline_rows(today)[0][:10], "work": work_summary(today.year)}
         if kind == "brief":
             message = "Write my morning brief using the trier-morning-brief skill and the data below. Keep it under 300 words, in English, preserving links."
             context.update(weather=CACHE.get("weather", []), mensa=CACHE.get("mensa", []),
@@ -506,9 +553,9 @@ def api_post(path, body):
         category = body.get("category", "other")
         if category not in ("visa", "uni", "money", "housing", "other"):
             raise ValueError("Choose a deadline category.")
-        args = ["deadline", "add", "--date", day, "--title", validate_text(body.get("title"), "title"), "--category", category]
+        args = ["deadline", "add", "--date", day, "--title=" + validate_text(body.get("title"), "title"), "--category", category]
         if body.get("note"):
-            args += ["--note", validate_text(body["note"], "note", 2000)]
+            args.append("--note=" + validate_text(body["note"], "note", 2000))
         return {"ok": True, "message": run_ctl(args)}
     if path == "/api/work":
         hours = float(body.get("hours", 0))
@@ -517,7 +564,7 @@ def api_post(path, body):
         kind = body.get("kind", "regular")
         if kind not in ("regular", "hiwi"):
             raise ValueError("Choose a work type.")
-        return {"ok": True, "message": run_ctl(["work", "add", "--hours", str(hours), "--employer", validate_text(body.get("employer"), "employer"), "--date", validate_date(body.get("date", "")), "--kind", kind])}
+        return {"ok": True, "message": run_ctl(["work", "add", "--hours", str(hours), "--employer=" + validate_text(body.get("employer"), "employer"), "--date", validate_date(body.get("date", "")), "--kind", kind])}
     if path in ("/api/jobs/rate", "/api/jobs/save"):
         job_id = body.get("id")
         if job_id not in gl.load_json(gl.data_dir() / "jobs_index.json", {}):

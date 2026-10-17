@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { ArrowClockwiseIcon, ArrowUpRightIcon, BookmarkSimpleIcon, BriefcaseIcon, CaretDownIcon, MapPinIcon, SparkleIcon, ThumbsUpIcon, ThumbsDownIcon, TranslateIcon } from '@phosphor-icons/react';
 import { selectJobs, distanceLabel } from './job-filters.js';
+import { niceDate, safeLink as link } from './format.js';
 
-const date = value => value ? new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'Date not provided';
-const link = value => { try { return ['https:', 'http:'].includes(new URL(value).protocol) ? value : '#'; } catch { return '#'; } };
+const date = value => value ? niceDate(value) : 'Date not provided';
 const initial = { search: '', group: 'all', distance: 'any', city: 'all', source: 'all', workplace: 'all', language: 'all', hideSenior: false, sort: 'distance' };
 
 export default function Jobs({ data, act, ask }) {
@@ -16,7 +16,7 @@ export default function Jobs({ data, act, ask }) {
   const active = Object.keys(initial).some(key => key !== 'sort' && filters[key] !== initial[key]);
   return <>
     <div className="page-heading discovery-heading"><div><div className="eyebrow">YOUR NEXT CHAPTER</div><h1>A little closer to your next role.</h1><p>English titles. Clear locations. A search that starts in Trier.</p></div><button className="button secondary" disabled={data.refresh.running} onClick={() => act('/api/refresh', {})}><ArrowClockwiseIcon size={16} weight="bold" />{data.refresh.running ? 'Refreshing…' : 'Refresh jobs'}</button></div>
-    <div className="job-source-strip"><span className="source-strip-label">GATHERED FROM</span>{(data.job_sources || []).map(source => <span key={source.name}><span className={`dot ${source.count ? 'green' : ''}`} />{source.name}<strong>{source.count}</strong></span>)}<span className="source-strip-note">Adzuna requires an API key</span></div>
+    <div className="job-source-strip"><span className="source-strip-label">GATHERED FROM</span>{(data.job_sources || []).map(source => <span key={source.name}><span className={`dot ${source.count ? 'green' : ''}`} />{source.name}<strong>{source.count}</strong></span>)}{data.adzuna_key_missing && <span className="source-strip-note">Adzuna requires an API key</span>}</div>
     <section className="job-filter-panel" aria-label="Job filters">
       <div className="job-filter-top"><div className="tabs" aria-label="Role groups">{[['all', 'All roles'], ['student', 'Student roles'], ['saved', 'Saved roles']].map(([key, label]) => <button key={key} className={filters.group === key ? 'active' : ''} aria-pressed={filters.group === key} onClick={() => set('group', key)}>{label}</button>)}</div><input className="search" aria-label="Search jobs" placeholder="Role, company or city…" value={filters.search} onChange={e => set('search', e.target.value)} /></div>
       <div className="job-filter-fields">

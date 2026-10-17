@@ -12,14 +12,14 @@
     "package": "electron-packager . Atlas --platform=darwin --arch=arm64 --out=release --overwrite --no-asar --app-bundle-id=local.atlas.assistant --icon=assets/Atlas.icns --ignore=release --ignore=tests --ignore=src --ignore=package-lock.json --ignore=render-icon.cjs"
   },
   "dependencies": {
-    "@phosphor-icons/react": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "react-markdown": "latest"
+    "@phosphor-icons/react": "^2.1.10",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-markdown": "^10.1.0"
   },
   "devDependencies": {
-    "@electron/packager": "latest",
-    "electron": "latest",
-    "vite": "latest"
+    "@electron/packager": "^20.3.0",
+    "electron": "^44.9.0",
+    "vite": "^8.3.4"
   }
 }

@@ -51,6 +51,8 @@ npm run build
 
 For a checkout outside `~/Projects/Atlas`, set `ATLAS_PROJECT` to the absolute path of its `germany-life-hermes` folder before starting the app or service. Run `npm start` from `app/` to open the desktop app, or `npm run package` to create an Apple Silicon app under `app/release/`.
 
+For live reload while editing the interface, start the service with `backend.py --port 4317` (or set `ATLAS_PORT` to match), open the launch URL it prints once so the browser gets a session, then run `npm run dev` and open `http://127.0.0.1:4173`.
+
 The service prints a local launch URL that establishes an app session. It listens only on loopback, requires a launch-session cookie for private endpoints, rejects outside origins, and exposes specific app actions. The renderer has no Node access.
 
 Tests from the repository root:
