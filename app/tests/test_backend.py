@@ -70,8 +70,52 @@ class AtlasTests(unittest.TestCase):
         self.assertNotIn('--continue', brief)
         self.assertNotIn('--resume', brief)
         chat = self.backend.hermes_arguments('chat')
-        self.assertIn('--continue', chat)
-        self.assertEqual(chat[chat.index('--toolsets')+1], 'terminal,skills,memory')
+        self.assertNotIn('--continue', chat)
+        self.assertNotIn('--resume', chat)
+        self.assertEqual(chat[chat.index('--toolsets')+1], 'terminal,skills,memory,web')
+
+    def test_recent_chat_is_bounded_and_omits_failed_and_brief_messages(self):
+        rows = [{'id':'old', 'role':'user', 'text':'a' * 6000},
+                {'id':'b', 'role':'assistant', 'text':'A long brief', 'kind':'brief'},
+                {'id':'a', 'role':'user', 'text':'Call me Alex'},
+                {'id':'e', 'role':'assistant', 'text':'Failure', 'status':'error'},
+                {'id':'u', 'role':'user', 'text':'What is my name?'},
+                {'id':'current', 'role':'assistant', 'text':''}]
+        with patch.dict(self.backend.DATA, {'chat':rows}):
+            self.assertEqual(self.backend.recent_chat('current'), [{'role':'user', 'text':'Call me Alex'}])
+
+    def test_brief_keeps_english_source_facts_and_renders_real_list_items(self):
+        rows = [{'title':'Russia targets Ukraine’s electricity supply', 'language':'en', 'source':'Publisher', 'url':'https://publisher.example/news'}]
+        result = self.backend.attach_brief_links('Europe:\n• Starlink restrictions [news-0]', rows)
+        self.assertIn('- [Russia targets Ukraine’s electricity supply][news-0] · Publisher', result)
+        self.assertNotIn('Starlink', result)
+
+    def test_brief_regions_follow_source_records_not_model_guesses(self):
+        rows = [{'title':'Trier campus update - Publisher', 'language':'en', 'ring':0, 'source':'Publisher', 'url':'https://publisher.example/news'}]
+        result = self.backend.attach_brief_links('Weather: rain\n\n**Germany**:\n- Wrong paraphrase [news-0]', rows)
+        self.assertIn('**Trier**', result)
+        self.assertNotIn('**Germany**', result)
+        self.assertIn('[Trier campus update][news-0] · Publisher', result)
+        self.assertIn('Weather: rain', result)
+
+    def test_background_translation_leaves_chat_available_and_saves_only_one_batch(self):
+        import io
+        titles = [f'Neue Ausstellung Nummer {i}' for i in range(5)]
+        response = io.BytesIO(json.dumps({'choices':[{'message':{'content':json.dumps({'titles':['New exhibition 0','New exhibition 1','New exhibition 2']})}}]}).encode())
+        key = self.project / 'test-background.key'
+        key.write_text('test-key')
+        finished = threading.Event()
+        save = self.backend.gl.save_json
+        def capture_save(path, value):
+            save(path, value)
+            if path.name == 'news_translations.json':
+                finished.set()
+        with patch.dict(self.backend.CACHE, {'news':[{'title':t, 'lang':'de'} for t in titles]}), patch.object(self.backend, 'model_health', return_value=True), patch.object(self.backend, 'MODEL_KEY_FILE', key), patch.object(self.backend.urllib.request, 'urlopen', return_value=response) as call, patch.object(self.backend.gl, 'save_json', side_effect=capture_save):
+            self.backend.translate_job_titles('news', background=True)
+            self.assertFalse(self.backend.CHAT_LOCK.locked())
+            self.assertTrue(finished.wait(3))
+            self.assertEqual(call.call_count, 1)
+            self.assertNotIn(titles[3], self.backend.NEWS_TRANSLATIONS)
 
     def test_compact_brief_keeps_each_region_links_and_translations_without_image_metadata(self):
         rows = [{'title':f'Story {ring}-{i}', 'url':f'https://source.example/{ring}/{i}', 'ring':ring, 'source':'Publisher', 'lang':'en', 'image':'https://source.example/large-image.jpg'} for ring in range(4) for i in range(6)]

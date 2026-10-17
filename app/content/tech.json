@@ -1,0 +1,121 @@
+{
+  "checked_at": "2026-10-17",
+  "calendars": [
+    {
+      "name": "Maschinendeck · Trier hackerspace",
+      "city": "Trier",
+      "url": "https://maschinendeck.org/"
+    },
+    {
+      "name": "hack.lu · Luxembourg",
+      "city": "Luxembourg City",
+      "url": "https://hack.lu/"
+    },
+    {
+      "name": "CCC event calendar",
+      "city": "Germany",
+      "url": "https://events.ccc.de/calendar/"
+    },
+    {
+      "name": "Developer conferences",
+      "city": "Europe & online",
+      "url": "https://developers.events/"
+    }
+  ],
+  "events": [
+    {
+      "id": "hacklu-2026",
+      "title": "hack.lu 2026",
+      "kind": "conference",
+      "start": "2026-10-20",
+      "end": "2026-10-23",
+      "city": "Luxembourg City",
+      "country": "Luxembourg",
+      "venue": "Parc Hotel, Dommeldange",
+      "source": "CIRCL / hack.lu",
+      "url": "https://2026.hack.lu/",
+      "description": "Computer security research, workshops and training.",
+      "checked_at": "2026-10-17",
+      "online": false
+    },
+    {
+      "id": "hacklu-hackathon-2026",
+      "title": "hack.lu Thursday evening hackathon",
+      "kind": "hackathon",
+      "start": "2026-10-22",
+      "end": "2026-10-22",
+      "city": "Luxembourg City",
+      "country": "Luxembourg",
+      "venue": "hack.lu conference venue",
+      "source": "hack.lu",
+      "url": "https://hack.lu/blog/hack.lu-hackathon/",
+      "description": "An evening build session announced by the conference organiser. Check participation requirements.",
+      "checked_at": "2026-10-17",
+      "online": false
+    },
+    {
+      "id": "hackatum-2026",
+      "title": "hackaTUM 2026",
+      "kind": "hackathon",
+      "start": "2026-11-27",
+      "end": "2026-11-29",
+      "city": "Munich",
+      "country": "Germany",
+      "venue": "TUM, Garching · city-level distance only",
+      "source": "Technical University of Munich",
+      "url": "https://hack.tum.de/",
+      "description": "A three-day university hackathon with industry challenges and workshops.",
+      "checked_at": "2026-10-17",
+      "online": false
+    },
+    {
+      "id": "fosdem-2027",
+      "title": "FOSDEM 2027",
+      "kind": "conference",
+      "start": "2027-01-30",
+      "end": "2027-01-31",
+      "city": "Brussels",
+      "country": "Belgium",
+      "venue": "See organiser’s venue information",
+      "source": "FOSDEM",
+      "url": "https://fosdem.org/2027/",
+      "description": "Free and open-source software talks and developer communities.",
+      "checked_at": "2026-10-17",
+      "online": false
+    },
+    {
+      "id": "chaosjetzt-2026",
+      "title": "chaos.jetzt Geekend #jetzt15",
+      "kind": "event",
+      "start": "2026-11-20",
+      "end": "2026-11-22",
+      "city": "Frankfurt am Main",
+      "country": "Germany",
+      "venue": "CCC Frankfurt",
+      "source": "Chaos Computer Club",
+      "url": "https://events.ccc.de/2026/09/29/jetzt15-geekend/",
+      "description": "Workshops and discussions for people aged 18–25. Check registration with the organiser.",
+      "checked_at": "2026-10-17",
+      "online": false
+    },
+    {
+      "id": "websummit-2026",
+      "title": "Web Summit",
+      "start": "2026-11-09",
+      "end": "2026-11-12",
+      "time_note": "See the conference schedule",
+      "city": "Lisbon",
+      "country": "Portugal",
+      "venue": "See organiser’s venue information",
+      "area": "Europe",
+      "category": "Tech & careers",
+      "price": "Paid conference · check tickets",
+      "description": "A technology conference for startups, founders and the wider tech community.",
+      "source": "Web Summit",
+      "url": "https://websummit.com/",
+      "checked_at": "2026-10-17",
+      "kind": "conference",
+      "online": false
+    }
+  ]
+}

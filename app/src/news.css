@@ -9,6 +9,7 @@
 .news-clear{font-size:10px;margin-right:5px}
 .news-filter-count{display:grid;place-items:center;min-width:17px;height:17px;background:#e8eddf;border-radius:3px;font-size:10px}
 .news-view-summary{font-size:11px;line-height:1.7;color:#75836a;margin:-7px 0 20px;overflow-wrap:anywhere}
+.news-translation-status{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;font-size:10px;color:#75836a;margin:-4px 0 22px;padding:10px 0;border-bottom:1px solid #e4e8df}.news-translation-status .text-button{font-size:10px;margin-left:auto}
 .news-story-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:26px 22px}
 .news-story{min-width:0;display:flex;flex-direction:column;border-bottom:1px solid #dfe4d8;padding-bottom:22px;gap:11px}
 .news-story .story-copy{display:flex;flex-direction:column;flex:1;min-width:0}
