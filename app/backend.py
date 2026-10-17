@@ -37,6 +37,7 @@ import morning_brief
 sys.path.insert(0, str(Path(__file__).parent))
 import discovery
 import updater
+import news_media
 
 # package.json is the one place the version is set; Electron's About box reads it too.
 VERSION = json.loads((Path(__file__).parent / "package.json").read_text())["version"]
@@ -71,6 +72,7 @@ DATA.setdefault("settings", {"reasoning": "medium"})
 CACHE = gl.load_json(SNAPSHOT, {"news": [], "jobs": [], "weather": [], "mensa": [], "sources": []})
 TRANSLATIONS = gl.load_json(STATE_DIR / "job_translations.json", {})
 NEWS_TRANSLATIONS = gl.load_json(STATE_DIR / "news_translations.json", {})
+NEWS_MEDIA = news_media.NewsMedia(STATE_DIR)
 UPDATES = updater.Updater(PROJECT.parent, Path(__file__).parent, os.environ.get("ATLAS_APP_BUNDLE"),
                           int(os.environ.get("ATLAS_DESKTOP_PID", "0")), os.getpid(), state_dir=STATE_DIR)
 _CONFIG = {"mtime": None, "value": {}}
@@ -244,8 +246,21 @@ def collect_news(feed):
             continue
         if not valid_url(item.get("link", "")):
             continue
-        result.append({"title": item["title"], "url": item["link"], "source": feed["name"],
-                       "ring": feed.get("ring", 0), "lang": feed.get("lang", "de"),
+        publisher = item.get("source") or feed["name"]
+        if publisher.startswith("DW:"):
+            publisher = "DW"
+        ring = feed.get("ring", 0)
+        # The Volksfreund feed also carries national stories; those aren't Trier news.
+        article_path = urllib.parse.urlsplit(item["link"]).path
+        if "volksfreund.de" == (urllib.parse.urlsplit(item["link"]).hostname or "").removeprefix("www."):
+            if article_path.startswith("/nachrichten/"):
+                ring = 2
+            elif article_path.startswith(("/region/rheinland-pfalz/", "/region/saarland/")):
+                ring = 1
+        result.append({"title": item["title"], "url": item["link"], "source": publisher,
+                       "feed": feed["name"], "publisher_url": item.get("source_url", ""),
+                       "image": item.get("image", ""), "image_alt": item.get("image_alt", ""),
+                       "ring": ring, "lang": feed.get("lang", "de"),
                        "published": published.isoformat() if published else None})
         if len(result) == 6:
             break
@@ -272,16 +287,19 @@ def refresh_data():
                     sources.append({"name": feed["name"], "ok": False, "detail": gl.short_error(exc)})
         def news_order(item):
             local = bool(re.search(r"trier|universit|hochschul|campus", item["title"], re.I))
-            university = "Universität" in item["source"]
+            university = "Universität" in item.get("feed", item["source"])
             return (item["ring"], not university, not local,
                     -(dt.datetime.fromisoformat(item["published"]).timestamp() if item["published"] else 0))
         news.sort(key=news_order)
-        unique, seen = [], set()
+        unique, seen = [], {}
         for item in news:
             key = gl.norm(item["title"].rsplit(" - ", 1)[0])
             if key not in seen:
                 unique.append(item)
-                seen.add(key)
+                seen[key] = item
+            elif item.get("image") and not seen[key].get("image"):
+                # Keep local ordering, but prefer the publisher's direct link and feed image.
+                seen[key].update(image=item["image"], image_alt=item.get("image_alt", ""), article_url=item["url"])
         status = []
         weather = morning_brief.weather(cfg, status)
         mensa = morning_brief.mensa(cfg, status, gl.now(cfg).date())
@@ -292,6 +310,7 @@ def refresh_data():
                 CACHE["news"] = unique
             CACHE.update(weather=weather, mensa=mensa, sources=sources, refreshed_at=iso_now())
             gl.save_json(SNAPSHOT, CACHE)
+        NEWS_MEDIA.start(unique)
         REFRESH_STATUS["message"] = "Finding jobs in Trier and the region…"
         matcher = job_scan.Matcher(cfg.get("jobs", {}))
         status = []
@@ -375,6 +394,7 @@ def public_state():
     today = gl.now(config()).date()
     result["jobs"] = enriched_jobs(jobs)
     result["news"] = [discovery.enrich_news(item, NEWS_TRANSLATIONS) for item in result.get("news", [])]
+    result["news"], result["news_media"] = NEWS_MEDIA.enrich(result["news"])
     result["events"] = discovery.upcoming_events(today)
     result["translation"] = TRANSLATION_STATUS.copy()
     labels = ["Bundesagentur für Arbeit", "Arbeitnow"]
@@ -683,6 +703,19 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(public_state())
             except Exception as exc:
                 return self.send_json({"error": str(exc)}, 500)
+        if path.startswith("/api/news/images/"):
+            picture = NEWS_MEDIA.image(path.removeprefix("/api/news/images/"))
+            if not picture:
+                return self.send_json({"error": "Article image unavailable."}, 404)
+            payload, mime = picture
+            self.send_response(200)
+            self.send_header("Content-Type", mime)
+            self.send_header("Content-Length", str(len(payload)))
+            self.send_header("Cache-Control", "private, max-age=86400, immutable")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            self.wfile.write(payload)
+            return
         if path == "/api/updates/log":
             log = UPDATES.log_file
             return self.send_json({"text": log.read_text(errors="replace")[-12000:] if log.exists() else "No update log yet."})

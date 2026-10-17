@@ -61,6 +61,29 @@ class AtlasTests(unittest.TestCase):
             urllib.request.urlopen(self.url + '/api/state')
         self.assertEqual(result.exception.code, 401)
 
+    def test_article_images_require_auth_and_only_serve_the_owned_cache(self):
+        path = '/api/news/images/' + 'a' * 64
+        with self.assertRaises(urllib.error.HTTPError) as result:
+            urllib.request.urlopen(self.url + path)
+        self.assertEqual(result.exception.code, 401)
+        with patch.object(self.backend.NEWS_MEDIA, 'image', return_value=(b'cached-photo', 'image/jpeg')) as image:
+            req = urllib.request.Request(self.url + path, headers={'X-Atlas-Token':self.backend.TOKEN})
+            with urllib.request.urlopen(req) as response:
+                self.assertEqual(response.read(), b'cached-photo')
+                self.assertEqual(response.headers['Content-Type'], 'image/jpeg')
+                self.assertIn('private', response.headers['Cache-Control'])
+            image.assert_called_once_with('a' * 64)
+
+    def test_news_keeps_real_publisher_feed_and_photo_and_separates_national_stories(self):
+        items = [{'title':'A headline', 'link':'https://publisher.example/story', 'source':'The Publisher', 'source_url':'https://publisher.example', 'image':'https://publisher.example/photo.jpg', 'image_alt':'Photo credit'},
+                 {'title':'National headline', 'link':'https://www.volksfreund.de/nachrichten/story', 'source':''}]
+        with patch.object(self.backend.gl, 'http_get', return_value=b'feed'), patch.object(self.backend.gl, 'parse_feed', return_value=items):
+            rows = self.backend.collect_news({'name':'Google News: Trier', 'url':'https://feed.example', 'ring':0})
+        self.assertEqual(rows[0]['source'], 'The Publisher')
+        self.assertEqual(rows[0]['feed'], 'Google News: Trier')
+        self.assertEqual(rows[0]['image_alt'], 'Photo credit')
+        self.assertEqual(rows[1]['ring'], 2)
+
     def test_update_install_waits_for_active_request(self):
         self.backend.CHAT_LOCK.acquire()
         try:

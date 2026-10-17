@@ -20,6 +20,7 @@ import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
+from html.parser import HTMLParser
 from pathlib import Path
 
 USER_AGENT = "germany-life-hermes/0.1 (personal news and job digest)"
@@ -224,6 +225,17 @@ def _local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
 
+class FeedImage(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.images = []
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "img" and attrs.get("src"):
+            self.images.append((attrs["src"], clean_text(attrs.get("alt", ""), 400)))
+
+
 def parse_feed(data: bytes) -> list[dict]:
     """Items from an RSS 2.0, RSS 1.0 (RDF) or Atom feed."""
     root = ET.fromstring(data)
@@ -231,7 +243,8 @@ def parse_feed(data: bytes) -> list[dict]:
     for element in root.iter():
         if _local_name(element.tag) not in ("item", "entry"):
             continue
-        item = {"title": "", "link": "", "published": None, "source": "", "summary": ""}
+        item = {"title": "", "link": "", "published": None, "source": "", "source_url": "", "summary": "", "image": "", "image_alt": ""}
+        images, html_images = [], []
         for child in element:
             name = _local_name(child.tag)
             text = (child.text or "").strip()
@@ -247,8 +260,23 @@ def parse_feed(data: bytes) -> list[dict]:
                 item["published"] = parse_date(text)
             elif name == "source":
                 item["source"] = clean_text(text)
+                item["source_url"] = child.attrib.get("url", "")
             elif name in ("description", "summary", "content", "encoded") and not item["summary"]:
                 item["summary"] = clean_text(text, 220)
+            if name in ("description", "summary", "content", "encoded") and text:
+                parser = FeedImage()
+                parser.feed(text)
+                html_images.extend(parser.images)
+        for child in element.iter():
+            name = _local_name(child.tag)
+            attrs = child.attrib
+            if ((name in ("content", "thumbnail") and (attrs.get("medium") == "image" or attrs.get("type", "").startswith("image/") or name == "thumbnail"))
+                    or name == "enclosure" and attrs.get("type", "").startswith("image/")) and attrs.get("url"):
+                images.append((attrs["url"], ""))
+            elif name == "imageUrl" and child.text:
+                images.append((child.text.strip(), ""))
+        if images or html_images:
+            item["image"], item["image_alt"] = (images or html_images)[0]
         if item["title"]:
             items.append(item)
     return items

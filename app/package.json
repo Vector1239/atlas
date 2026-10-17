@@ -1,6 +1,6 @@
 {
   "name": "atlas-local",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Your local life assistant, powered by Hermes and Qwen",
   "private": true,
   "type": "module",

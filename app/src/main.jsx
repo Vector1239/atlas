@@ -5,12 +5,13 @@ import { ArrowUpRightIcon, ArrowUpIcon, ArrowClockwiseIcon, BookmarkSimpleIcon, 
 import './style.css';
 import Explore from './Explore.jsx';
 import Headlines from './Headlines.jsx';
+import News from './News.jsx';
 import Updates from './Updates.jsx';
 import { distanceLabel } from './job-filters.js';
 import { niceDate, safeLink } from './format.js';
 import './discovery.css';
 
-const nav = [['today', 'Today', HouseIcon], ['explore', 'Explore', MapPinIcon], ['admin', 'Life admin', CalendarBlankIcon], ['chat', 'Ask Atlas', ChatCircleDotsIcon], ['settings', 'Settings', GearSixIcon]];
+const nav = [['today', 'Today', HouseIcon], ['news', 'News', FileTextIcon], ['explore', 'Explore', MapPinIcon], ['admin', 'Life admin', CalendarBlankIcon], ['chat', 'Ask Atlas', ChatCircleDotsIcon], ['settings', 'Settings', GearSixIcon]];
 const when = date => date ? niceDate(date, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Not yet';
 const flagLabel = value => ({ 'student-job': 'Student role', 'senior': 'Senior', 'german-required': 'German required', 'posting-in-german': 'German posting', 'english': 'English', 'visa-sponsorship': 'Visa sponsorship', 'remote': 'Remote' }[value] || value);
 
@@ -35,7 +36,7 @@ function App() {
   const [modal, setModal] = useState(null), [saving, setSaving] = useState(false), [loadError, setLoadError] = useState(''), [stoppingModel, setStoppingModel] = useState(false);
   const active = useRef(true);
   useEffect(() => { window.scrollTo(0, 0); }, [page]);
-  async function load() { try { const next = await request('/api/state'); setData(next); setLoadError(''); active.current = next.busy || next.refresh.running || next.translation.running || next.updates?.running || ['loading', 'downloading'].includes(next.model.state); } catch (e) { setLoadError(e.message); } }
+  async function load() { try { const next = await request('/api/state'); setData(next); setLoadError(''); active.current = next.busy || next.news_media?.running || next.refresh.running || next.translation.running || next.updates?.running || ['loading', 'downloading'].includes(next.model.state); } catch (e) { setLoadError(e.message); } }
   useEffect(() => { let timer, stopped = false; const poll = async () => { await load(); if (!stopped) timer = setTimeout(poll, active.current ? 2500 : 15000); }; poll(); return () => { stopped = true; clearTimeout(timer); }; }, [data?.updates?.running]);
   useEffect(() => { if (notice) { const timer = setTimeout(() => setNotice(''), 4000); return () => clearTimeout(timer); } }, [notice]);
   async function act(path, body, message) { try { setError(''); const result = await request(path, body); await load(); if (message) setNotice(message); return result; } catch (e) { setError(e.message); return null; } }
@@ -79,12 +80,13 @@ function App() {
           </Card><div className="right-stack"><Card title="Coming up" label="ON YOUR RADAR" action={<button className="icon-button" onClick={() => setModal('deadline')} aria-label="Add deadline"><Icon as={PlusIcon} /></button>}>
             {data.deadlines.filter(d => d.days_left >= -3).length ? <div className="deadline-preview">{data.deadlines.filter(d => d.days_left >= -3).slice(0, 3).map((d, i) => <div className="deadline-row" key={i}><div className="date-square"><span>{niceDate(d.date, { month: 'short' })}</span><strong>{new Date(d.date).getDate()}</strong></div><div><strong>{d.title}</strong><small>{d.days_left === 0 ? 'Today' : d.days_left < 0 ? `${-d.days_left} days overdue` : `In ${d.days_left} days`}</small></div></div>)}</div> : <Empty icon={CalendarBlankIcon} title="Room to breathe." text="No personal deadlines added yet."><button className="text-button" onClick={() => setModal('deadline')}>Add your first deadline <Icon as={PlusIcon} size={14} /></button></Empty>}
           </Card><Card title="Work, in balance" label={`${new Date(data.date).getFullYear()} · WORK-DAY TRACKER`}><div className="budget"><strong>{data.work.remaining}<span> / {data.work.limit}</span></strong><span>day equivalents remaining</span></div><Progress value={data.work.used / data.work.limit * 100} /><div className="card-footer"><span>{data.work.used} used this year</span><button className="text-button" onClick={() => setModal('work')}>Log a shift <Icon as={PlusIcon} size={14} /></button></div></Card></div></div>
-          <div className="lower-grid"><Headlines data={data} act={act} ask={ask} /><div className="right-stack"><Card title="A role worth a look" label="YOUR NEXT CHAPTER" action={<Icon as={BriefcaseIcon} />}>
+          <div className="lower-grid"><Headlines data={data} openNews={() => navigate('news')} /><div className="right-stack"><Card title="A role worth a look" label="YOUR NEXT CHAPTER" action={<Icon as={BriefcaseIcon} />}>
             {data.jobs.length ? <><JobPreview job={data.jobs.find(j => j.flags.includes('student-job')) || data.jobs[0]} /><button className="text-button full-link" onClick={() => navigate('jobs')}>Explore {data.jobs.length} matching roles <Icon as={ArrowUpRightIcon} size={15} /></button></> : <Empty icon={BriefcaseIcon} title="Finding your next step." text={data.refresh.running ? 'Your regional job sources are being checked.' : 'Refresh sources to see matching roles.'} />}
           </Card><Card title="On the menu" label="MENSA TODAY">{data.mensa.length ? <div className="mensa">{data.mensa.map((line, i) => <p key={i} className={line.startsWith('  -') ? 'meal' : 'canteen'}>{line.replace(/^\s*-\s*/, '')}</p>)}</div> : <p className="muted">No menu available for today.</p>}</Card></div></div>
           <Card title="Something to look forward to" label="UPCOMING EVENTS" className="today-events" action={<button className="text-button" onClick={() => navigate('events')}>Explore events <Icon as={ArrowUpRightIcon} size={15} /></button>}><div className="today-event-grid">{(data.events?.items || []).filter(event => event.area === 'Trier').slice(0, 3).map(event => <a key={event.id} href={safeLink(event.url)} target="_blank" rel="noreferrer"><span>{niceDate(event.start)} · {event.city}</span><strong>{event.title}</strong><small>{event.source}<Icon as={ArrowUpRightIcon} size={12} /></small></a>)}</div></Card>
           <div className="footnote"><span>{sourceCount} sources available · {data.sources.filter(s => !s.ok).length} need attention</span><button className="text-button" onClick={() => navigate('settings')}>View source status <Icon as={ArrowUpRightIcon} size={13} /></button></div>
         </>}
+        {page === 'news' && <News data={data} act={act} ask={ask} />}
         {page === 'explore' && <Explore data={data} act={act} ask={ask} initialKind={exploreKind} />}
         {page === 'admin' && <Admin data={data} setModal={setModal} />}
         {page === 'chat' && <Chat data={data} ask={ask} act={act} />}

@@ -127,6 +127,18 @@ class ProjectCase(unittest.TestCase):
 
 
 class FeedTests(unittest.TestCase):
+    def test_article_images_from_media_rss_enclosures_and_html_stay_with_their_story(self):
+        xml = b'''<rss xmlns:media="http://search.yahoo.com/mrss/"><channel>
+        <item><title>Enclosure</title><link>https://paper.example/a</link><source url="https://paper.example">The Paper</source><enclosure url="https://paper.example/a.jpg" type="image/jpeg"/></item>
+        <item><title>Media</title><media:group><media:content url="https://paper.example/b.jpg" medium="image"/></media:group></item>
+        <item><title>HTML</title><description>&lt;p&gt;&lt;img src="https://paper.example/c.jpg" alt="Photo credit"/&gt;Story&lt;/p&gt;</description></item>
+        </channel></rss>'''
+        rows = gl.parse_feed(xml)
+        self.assertEqual([row['image'] for row in rows], ['https://paper.example/a.jpg', 'https://paper.example/b.jpg', 'https://paper.example/c.jpg'])
+        self.assertEqual(rows[0]['source_url'], 'https://paper.example')
+        self.assertEqual(rows[2]['image_alt'], 'Photo credit')
+        self.assertEqual(rows[2]['summary'], 'Story')
+
     def test_rss_atom_rdf(self):
         rss = gl.parse_feed(RSS)
         self.assertEqual(rss[0]["title"], "Neue Mensa in Trier eröffnet - Volksfreund")

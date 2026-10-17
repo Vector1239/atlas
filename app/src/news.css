@@ -1,0 +1,56 @@
+.news-heading h1{font-size:40px;letter-spacing:-1.3px;text-wrap:balance}
+.news-heading p{font-size:12px;line-height:1.8;max-width:580px}
+.news-edition{display:flex;align-items:center;gap:22px;flex-wrap:wrap;border-top:1px solid #dfe4d8;padding:16px 0;color:#86917b;font-size:10px}
+.news-edition>span:first-child{display:flex;align-items:center;gap:8px;color:#5c7050;font-variant-numeric:tabular-nums}
+.news-edition .text-button{margin-left:auto;font-size:10px}
+.news-filter-panel{padding:0 17px 16px;background:#f4f5ef;border:1px solid #e1e5d9;border-radius:7px;margin-bottom:20px}
+.news-filter-top{display:flex;align-items:center;justify-content:space-between;gap:20px;border-bottom:1px solid #e1e5d9;margin-bottom:16px}
+.news-filter-top .tabs{gap:22px;flex-shrink:0;border:0;margin:0}
+.news-filter-top .search{margin:10px 0;width:min(100%,300px);min-width:100px;background:#fff}
+.news-filter-fields{display:flex;gap:15px;align-items:end;flex-wrap:wrap}
+.news-filter-fields label{margin:0;gap:6px;font-size:10px;color:#738168;flex:1;min-width:115px}
+.news-filter-fields select{font-size:11px;padding:9px 8px;background:#fff;width:100%;border-color:#dfe4d6}
+.news-filter-fields .check-label{flex:0 1 auto;min-width:unset;padding:9px 0;flex-direction:row;align-items:center;gap:7px}
+.news-filter-fields>.text-button{padding-bottom:10px;font-size:10px}
+.news-translation{display:flex;gap:18px;align-items:center;margin-bottom:22px;padding:14px 17px}
+.news-translation>div{flex:1}
+.news-translation strong{font-weight:550;color:#786e4c}
+.news-translation .button{font-size:10px;white-space:nowrap;padding:9px 12px}
+.news-results-label{display:flex;justify-content:space-between;gap:12px;font-size:9px;color:#97a08e;margin:24px 0 15px}
+.news-lead{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:32px;padding-bottom:30px;border-bottom:1px solid #dfe5d6}
+.news-lead.single{grid-template-columns:minmax(0,780px)}
+.news-side-stories{border-left:1px solid #e3e8db;padding-left:28px;display:flex;flex-direction:column;gap:25px}
+.news-story{min-width:0;display:flex;flex-direction:column;gap:14px}
+.news-story.compact{padding-bottom:25px;border-bottom:1px solid #e3e8db}
+.news-story.compact:last-child{padding-bottom:0;border:0}
+.story-kicker{display:flex;gap:7px;flex-wrap:wrap;font-size:9px;color:#87987b;line-height:1.7;margin-bottom:8px}
+.story-kicker>span:first-child{font-weight:550;color:#627955}
+.news-story h2{font:23px/1.35 Georgia,serif;color:#465b39;letter-spacing:-.4px;text-wrap:pretty;overflow-wrap:anywhere}
+.news-story h2 a>svg{display:inline;margin-left:7px;vertical-align:baseline;color:#9daf8c;width:13px;height:13px}
+.news-story h2 a:hover{text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:1px}
+.news-story.prominent h2{font-size:29px;line-height:1.3;letter-spacing:-.6px}
+.news-story.prominent .article-picture{margin-top:17px}
+.news-story.compact h2{font-size:23px;line-height:1.4}
+.story-date{display:flex;flex-wrap:wrap;gap:7px 12px;color:#97a48b;font-size:9px;line-height:1.8;margin-top:11px;font-variant-numeric:tabular-nums}
+.story-date>span{color:#a8b19e}
+.story-actions{display:flex;flex-wrap:wrap;gap:18px;margin-top:16px;align-items:center}
+.story-actions a,.story-actions button{font-size:10px;color:#789167;display:inline-flex;gap:5px;align-items:center;padding:0;line-height:1.8}
+.story-actions a:hover,.story-actions button:hover{color:#3f5d30;text-decoration:underline;text-underline-offset:3px}
+.article-picture{margin:0;min-width:0}
+.article-picture>a{display:block;overflow:hidden;background:#edf0e8;border-radius:3px}
+.article-picture img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;transition:transform .25s ease}
+.article-picture a:hover img{transform:scale(1.02)}
+.article-picture figcaption{color:#a1ab95;font-size:8px;line-height:1.6;margin-top:6px;overflow-wrap:anywhere}
+.news-story-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:30px 34px}
+.news-story-grid>.news-story{border-bottom:1px solid #e1e7d8;padding-bottom:25px;align-self:start}
+.news-story-grid .article-picture img{max-height:260px}
+.news-more{padding-top:27px}
+.news-section-heading{display:flex;align-items:baseline;gap:17px;flex-wrap:wrap;margin-bottom:25px}
+.news-section-heading>span{font-size:8px;letter-spacing:1.3px;color:#9ca58f}
+.news-section-heading h2{font:25px/1.3 Georgia,serif;letter-spacing:-.4px;color:#627951}
+.news-pagination{display:flex;align-items:center;justify-content:space-between;padding:25px 0;gap:20px;font-size:10px;color:#96a28a}
+.news-pagination .button{font-size:11px}
+.news-footnote{font-size:9px;line-height:1.9;color:#a2ab97;border-top:1px solid #e1e6d9;padding-top:17px;max-width:850px}
+@media(max-width:1150px){.news-filter-top .tabs{gap:15px}.news-edition{gap:12px}.news-edition>span:nth-child(2){flex-basis:100%;order:3}.news-filter-top{gap:15px}.news-lead{gap:23px}.news-side-stories{padding-left:21px}.news-story.prominent h2{font-size:26px}.news-story.compact h2{font-size:21px}}
+@media(max-width:850px){.news-lead{grid-template-columns:1fr}.news-side-stories{display:grid;grid-template-columns:1fr 1fr;border:0;border-top:1px solid #e1e6d9;padding:22px 0 0;gap:23px}.news-story.compact{border:0;padding:0}.news-filter-top{flex-wrap:wrap;gap:0;padding-bottom:13px}.news-filter-top .search{width:100%;max-width:none;margin:0}.news-filter-top .tabs{width:100%;justify-content:space-between}.news-story-grid{gap:25px}.news-heading h1{font-size:35px}.news-translation{align-items:start;flex-direction:column;gap:10px}}
+@media(max-width:640px){.news-story-grid,.news-side-stories{grid-template-columns:1fr}.news-story.compact{border-bottom:1px solid #e1e6d9;padding-bottom:20px}.news-filter-fields{gap:12px}.news-filter-fields label{flex:1 1 120px}.news-heading h1{font-size:32px}.news-edition .text-button{font-size:9px;margin-left:0}.news-results-label{font-size:8px}.news-story h2,.news-story.compact h2{font-size:23px}.news-story.prominent h2{font-size:27px}.news-translation .button{font-size:10px}.news-pagination{align-items:start;flex-direction:column;gap:14px}}
