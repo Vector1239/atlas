@@ -35,7 +35,7 @@ function App() {
   const [modal, setModal] = useState(null), [saving, setSaving] = useState(false), [loadError, setLoadError] = useState(''), [stoppingModel, setStoppingModel] = useState(false);
   const active = useRef(true);
   async function load() { try { const next = await request('/api/state'); setData(next); setLoadError(''); active.current = next.busy || next.refresh.running || next.translation.running || next.updates?.running || ['loading', 'downloading'].includes(next.model.state); } catch (e) { setLoadError(e.message); } }
-  useEffect(() => { let timer, stopped = false; const poll = async () => { await load(); if (!stopped) timer = setTimeout(poll, active.current ? 2500 : 15000); }; poll(); return () => { stopped = true; clearTimeout(timer); }; }, []);
+  useEffect(() => { let timer, stopped = false; const poll = async () => { await load(); if (!stopped) timer = setTimeout(poll, active.current ? 2500 : 15000); }; poll(); return () => { stopped = true; clearTimeout(timer); }; }, [data?.updates?.running]);
   useEffect(() => { if (notice) { const timer = setTimeout(() => setNotice(''), 4000); return () => clearTimeout(timer); } }, [notice]);
   async function act(path, body, message) { try { setError(''); const result = await request(path, body); await load(); if (message) setNotice(message); return result; } catch (e) { setError(e.message); return null; } }
   async function stopQwen() {
