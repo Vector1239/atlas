@@ -1,0 +1,251 @@
+{
+  "Aachen": {
+    "lat": 50.77664,
+    "lon": 6.08342,
+    "name": "Aachen",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "North Rhine-Westphalia",
+    "geonames_id": 3247449,
+    "precision": "city"
+  },
+  "Berlingen, Eifel": {
+    "lat": 50.23894,
+    "lon": 6.71934,
+    "name": "Berlingen",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "Rhineland-Palatinate",
+    "geonames_id": 2950140,
+    "precision": "city"
+  },
+  "Bonn": {
+    "lat": 50.73438,
+    "lon": 7.09549,
+    "name": "Bonn",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "North Rhine-Westphalia",
+    "geonames_id": 2946447,
+    "precision": "city"
+  },
+  "Eschborn, Taunus": {
+    "lat": 50.14328,
+    "lon": 8.57111,
+    "name": "Eschborn",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "Hesse",
+    "geonames_id": 2929134,
+    "precision": "city"
+  },
+  "Frankfurt am Main": {
+    "lat": 50.11552,
+    "lon": 8.68417,
+    "name": "Frankfurt am Main",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "Hesse",
+    "geonames_id": 2925533,
+    "precision": "city"
+  },
+  "Graben-Neudorf": {
+    "lat": 49.16695,
+    "lon": 8.49243,
+    "name": "Graben-Neudorf",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "Baden-Wurttemberg",
+    "geonames_id": 3272459,
+    "precision": "city"
+  },
+  "Ingelheim am Rhein": {
+    "lat": 49.97078,
+    "lon": 8.05883,
+    "name": "Ingelheim",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "Rhineland-Palatinate",
+    "geonames_id": 2896020,
+    "precision": "city"
+  },
+  "Karlsruhe, Baden": {
+    "lat": 49.00937,
+    "lon": 8.40444,
+    "name": "Karlsruhe",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "Baden-Wurttemberg",
+    "geonames_id": 2892794,
+    "precision": "city"
+  },
+  "Kirchberg (Hunsrück)": {
+    "lat": 49.94395,
+    "lon": 7.407,
+    "name": "Kirchberg",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "Rhineland-Palatinate",
+    "geonames_id": 2890660,
+    "precision": "city"
+  },
+  "Köln": {
+    "lat": 50.93333,
+    "lon": 6.95,
+    "name": "Cologne",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "North Rhine-Westphalia",
+    "geonames_id": 2886242,
+    "precision": "city"
+  },
+  "Leverkusen": {
+    "lat": 51.0303,
+    "lon": 6.98432,
+    "name": "Leverkusen",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "North Rhine-Westphalia",
+    "geonames_id": 2878234,
+    "precision": "city"
+  },
+  "Ludwigshafen am Rhein": {
+    "lat": 49.48121,
+    "lon": 8.44641,
+    "name": "Ludwigshafen am Rhein",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "Rhineland-Palatinate",
+    "geonames_id": 2875376,
+    "precision": "city"
+  },
+  "Mainz am Rhein": {
+    "lat": 49.98185,
+    "lon": 8.28008,
+    "name": "Mainz",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "Rhineland-Palatinate",
+    "geonames_id": 2874225,
+    "precision": "city"
+  },
+  "Mannheim": {
+    "lat": 49.4891,
+    "lon": 8.46694,
+    "name": "Mannheim",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "Baden-Wurttemberg",
+    "geonames_id": 2873891,
+    "precision": "city"
+  },
+  "Meckenheim, Rheinland": {
+    "lat": 50.62388,
+    "lon": 7.02942,
+    "name": "Meckenheim",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "North Rhine-Westphalia",
+    "geonames_id": 2872582,
+    "precision": "city"
+  },
+  "Saarbrücken": {
+    "lat": 49.23262,
+    "lon": 7.00982,
+    "name": "Saarbrücken",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "Saarland",
+    "geonames_id": 2842647,
+    "precision": "city"
+  },
+  "Simmern, Hunsrück": {
+    "lat": 49.98198,
+    "lon": 7.52351,
+    "name": "Simmern",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "Rhineland-Palatinate",
+    "precision": "city"
+  },
+  "Trier": {
+    "lat": 49.75565,
+    "lon": 6.63935,
+    "name": "Trier",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "Rhineland-Palatinate",
+    "geonames_id": 2821164,
+    "precision": "city"
+  },
+  "Wiesbaden": {
+    "lat": 50.08601,
+    "lon": 8.24435,
+    "name": "Wiesbaden",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "Hesse",
+    "geonames_id": 2809346,
+    "precision": "city"
+  },
+  "Wittlich": {
+    "lat": 49.98596,
+    "lon": 6.89308,
+    "name": "Wittlich",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "Rhineland-Palatinate",
+    "geonames_id": 2807240,
+    "precision": "city"
+  },
+  "Berlin": {
+    "lat": 52.52437,
+    "lon": 13.41053,
+    "name": "Berlin",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "State of Berlin",
+    "geonames_id": 2950159,
+    "precision": "city"
+  },
+  "Eindhoven": {
+    "lat": 51.44083,
+    "lon": 5.47778,
+    "name": "Eindhoven",
+    "country": "The Netherlands",
+    "country_code": "NL",
+    "region": "North Brabant",
+    "geonames_id": 2756253,
+    "precision": "city"
+  },
+  "Lisbon": {
+    "lat": 38.72509,
+    "lon": -9.1498,
+    "name": "Lisbon",
+    "country": "Portugal",
+    "country_code": "PT",
+    "region": "Lisbon District",
+    "geonames_id": 2267057,
+    "precision": "city"
+  },
+  "Luxembourg City": {
+    "lat": 49.60982,
+    "lon": 6.13268,
+    "name": "Luxembourg",
+    "country": "Luxembourg",
+    "country_code": "LU",
+    "region": "Luxembourg",
+    "geonames_id": 2960316,
+    "precision": "city"
+  },
+  "Nuremberg": {
+    "lat": 49.45421,
+    "lon": 11.07752,
+    "name": "Nuremberg",
+    "country": "Germany",
+    "country_code": "DE",
+    "region": "Bavaria",
+    "geonames_id": 2861650,
+    "precision": "city"
+  }
+}

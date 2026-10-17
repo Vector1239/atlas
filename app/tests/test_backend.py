@@ -134,11 +134,33 @@ class AtlasTests(unittest.TestCase):
 
     def test_translation_does_not_start_a_paused_model(self):
         with patch.object(self.backend, 'model_health', return_value=False), patch.object(self.backend, 'start_model') as start:
-            with self.assertRaises(urllib.error.HTTPError) as result:
-                self.post('/api/jobs/translate', {})
-            self.assertEqual(result.exception.code, 400)
+            for endpoint in ('/api/jobs/translate', '/api/news/translate'):
+                with self.assertRaises(urllib.error.HTTPError) as result:
+                    self.post(endpoint, {})
+                self.assertEqual(result.exception.code, 400)
             start.assert_not_called()
             self.assertFalse(self.backend.CHAT_LOCK.locked())
+
+    def test_headline_translation_uses_local_model_and_separate_persistent_cache(self):
+        import io
+        title = 'Neue Ausstellung im Stadtmuseum eröffnet'
+        self.backend.CACHE['news'] = [{'title': title, 'lang': 'de'}]
+        response = io.BytesIO(json.dumps({'choices': [{'message': {'content': json.dumps({'titles': ['New exhibition opens at the city museum']})}}]}).encode())
+        key = self.project / 'test-news-model.key'
+        key.write_text('test-key')
+        finished = threading.Event()
+        save = self.backend.gl.save_json
+        def capture_save(path, data):
+            save(path, data)
+            if path.name == 'news_translations.json':
+                finished.set()
+        with patch.object(self.backend, 'model_health', return_value=True), patch.object(self.backend, 'MODEL_KEY_FILE', key), patch.object(self.backend.urllib.request, 'urlopen', return_value=response) as call, patch.object(self.backend.gl, 'save_json', side_effect=capture_save), patch.object(self.backend, 'start_model') as start:
+            self.backend.translate_job_titles('news')
+            self.assertTrue(finished.wait(3))
+            self.assertEqual(call.call_args.args[0].full_url, self.backend.MODEL_URL + '/v1/chat/completions')
+            start.assert_not_called()
+        self.assertEqual(json.loads((self.project / 'state/news_translations.json').read_text())[title], 'New exhibition opens at the city museum')
+        self.assertNotIn(title, self.backend.TRANSLATIONS)
 
     def test_translation_worker_saves_local_model_result_by_original_title(self):
         title = 'Werkstudent für Nachhaltigkeitsforschung'

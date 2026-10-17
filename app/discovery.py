@@ -10,6 +10,29 @@ import re
 CONTENT = Path(__file__).parent / "content"
 TITLE_TRANSLATIONS = json.loads((CONTENT / "job-translations.json").read_text())
 EVENT_CATALOG = json.loads((CONTENT / "events.json").read_text())
+PLACES = json.loads((CONTENT / "places.json").read_text())
+NEWS_TRANSLATIONS = json.loads((CONTENT / "news-translations.json").read_text())
+
+
+def city_location(city, country="Germany"):
+    """Only use verified city matches. Never invent an exact address or unknown pin."""
+    place = PLACES.get(city)
+    if not place or place["country"] != {"Netherlands": "The Netherlands"}.get(country, country):
+        return None
+    return {**place, "label": city, "source": "Open-Meteo / GeoNames"}
+
+
+def enrich_news(item, translations=None):
+    title = item["title"]
+    translated = (translations or {}).get(title) or NEWS_TRANSLATIONS.get(title)
+    # Feed language describes the source, not necessarily each individual headline.
+    german = re.search(r"[äöüß]|\b(?:der|die|das|für|und|im|zum|zur|mit|nach|bei|von|wird|werden|wer|suche|zehn|neue|neues|erneut|ohne|wegen)\b", title, re.I)
+    english = re.search(r"\b(?:the|a|an|is|are|for|to|of|in|on|with|how|what|where|i|my|looking|says)\b", title, re.I)
+    # A proper name can contain an umlaut in a clearly English headline.
+    original_english = bool(english and (not german or re.search(r"\b(?:the|for|to|of|how|what|where|says)\b", title, re.I)))
+    title_en = translated or (title if original_english or item.get("lang") == "en" and not german else None)
+    return {**item, "title_en": title_en, "translation_needed": title_en is None,
+            "translated": bool(translated and translated != title)}
 
 REGIONS = {"RHEINLAND_PFALZ": "Rhineland-Palatinate", "SAARLAND": "Saarland",
            "NORDRHEIN_WESTFALEN": "North Rhine-Westphalia", "HESSEN": "Hesse",
@@ -59,6 +82,7 @@ def enrich_job(job, translations=None):
                   distance_origin=job.get("distance_origin") or ("Trier" if match and job.get("source") == "Bundesagentur" else ""),
                   source_label="Bundesagentur für Arbeit" if job.get("source") == "Bundesagentur" else job.get("source", "Unknown source"))
     result["distance_from_trier"] = distance if result["distance_origin"].strip().lower() == "trier" else None
+    result["location"] = city_location(result["city"])
     return result
 
 
@@ -74,6 +98,7 @@ def upcoming_events(today):
             continue
         if end < today or end < start or row.get("cancelled"):
             continue
-        items.append({**row, "ongoing": start < today, "stale": (today - checked).days > 14})
+        items.append({**row, "location": city_location(row.get("city"), row.get("country", "Germany")),
+                      "ongoing": start < today, "stale": (today - checked).days > 14})
     return {"items": sorted(items, key=lambda row: row["start"]),
             "calendars": EVENT_CATALOG["calendars"], "checked_at": EVENT_CATALOG["checked_at"]}

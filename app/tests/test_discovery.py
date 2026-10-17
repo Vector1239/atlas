@@ -9,6 +9,29 @@ import discovery
 
 
 class DiscoveryTests(unittest.TestCase):
+    def test_english_headline_keeps_original_and_new_german_headline_waits(self):
+        title = 'Uni Trier startet ins neue Semester: Mehr als 2.200 neue Studierende auf dem Campus - lokalo.de'
+        item = {'title': title, 'lang': 'de'}
+        row = discovery.enrich_news(item)
+        self.assertIn('2,200', row['title_en'])
+        self.assertEqual(row['title'], title)
+        self.assertTrue(row['translated'])
+        self.assertNotIn('title_en', item)
+        # Article language wins over inaccurate feed metadata.
+        english = discovery.enrich_news({'title': 'Where are the Trier musicians?', 'lang': 'de'})
+        self.assertFalse(english['translation_needed'])
+        german = discovery.enrich_news({'title': 'Neue Ausstellung im Stadtmuseum eröffnet', 'lang': 'en'})
+        self.assertTrue(german['translation_needed'])
+        self.assertFalse(german['translated'])
+        self.assertEqual(discovery.enrich_news(german, {german['title']: 'New exhibition opens at the city museum'})['title_en'], 'New exhibition opens at the city museum')
+
+    def test_city_pins_are_verified_country_matched_and_approximate(self):
+        self.assertEqual(discovery.city_location('Trier')['precision'], 'city')
+        self.assertIsNone(discovery.city_location('Trier', 'France'))
+        self.assertIsNone(discovery.city_location('Unverified village'))
+        self.assertLess(discovery.city_location('Simmern, Hunsrück')['lat'], 50)
+        self.assertIsNotNone(discovery.city_location('Eindhoven', 'Netherlands'))
+
     def test_legacy_location_becomes_numeric_filterable_distance(self):
         row = discovery.enrich_job({'title': 'Data Engineer', 'where': 'Trier, RHEINLAND_PFALZ (1,5 km)', 'source': 'Bundesagentur'})
         self.assertEqual(row['city'], 'Trier')

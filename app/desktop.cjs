@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 
 app.setName('Atlas');
+app.userAgentFallback += ` Atlas/${app.getVersion()} (+https://github.com/Vector1239/atlas)`;
 let backend, window, baseURL, exiting = false;
 const project = process.env.ATLAS_PROJECT || path.join(os.homedir(), 'Projects/Atlas/germany-life-hermes');
 const python = process.env.ATLAS_PYTHON || '/opt/homebrew/bin/python3.12';

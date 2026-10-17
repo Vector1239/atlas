@@ -1,0 +1,8 @@
+import React from 'react';
+import { ArrowUpRightIcon, CalendarBlankIcon, MapPinIcon } from '@phosphor-icons/react';
+import { safeLink } from './format.js';
+const format = value => new Date(`${value}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+export function EventListing({ event }) {
+  return <article className="event-row"><div className="event-date"><span>{new Date(`${event.start}T12:00:00`).toLocaleDateString('en-GB', { month: 'short' })}</span><strong>{Number(event.start.slice(8, 10))}</strong><small>{event.start.slice(0, 4)}</small></div><div className="event-body"><div className="event-kicker"><span>{event.area}</span><span>·</span><span>{event.category}</span>{event.ongoing && <span className="badge sage">On now</span>}</div><h2><a href={safeLink(event.url)} target="_blank" rel="noreferrer">{event.title}<ArrowUpRightIcon size={17} weight="bold" /></a></h2><div className="event-location"><MapPinIcon size={15} weight="bold" /><strong>{event.city}, {event.country}</strong><span>{event.venue}</span></div><p>{event.description}</p><div className="event-timing"><CalendarBlankIcon size={15} weight="bold" /><strong>{format(event.start)}{event.end !== event.start && ` – ${format(event.end)}`}</strong><span>{event.time_note}</span></div>{event.stale && <p className="event-stale">The last date check is over two weeks old. Confirm the current programme on the official site.</p>}</div><div className="event-source"><span className="badge">{event.price}</span><a className="text-button" href={safeLink(event.url)} target="_blank" rel="noreferrer">{event.source}<ArrowUpRightIcon size={14} /></a><small>Checked {format(event.checked_at)}</small></div></article>;
+}
