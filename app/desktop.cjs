@@ -8,6 +8,7 @@ app.setName('Atlas');
 let backend, window, baseURL, exiting = false;
 const project = process.env.ATLAS_PROJECT || path.join(os.homedir(), 'Projects/Atlas/germany-life-hermes');
 const python = process.env.ATLAS_PYTHON || '/opt/homebrew/bin/python3.12';
+const bundle = app.isPackaged ? path.resolve(__dirname, '../../..') : '';
 
 // A second launch only focuses the first window; it must not start its own backend.
 const primary = app.requestSingleInstanceLock();
@@ -28,14 +29,16 @@ function createWindow(url) {
     if (new URL(next).origin !== baseURL) { event.preventDefault(); external(next); }
   });
   window.once('ready-to-show', () => window.show());
-  window.loadURL(url);
+  const launchURL = new URL(url);
+  if (process.env.ATLAS_OPEN_UPDATES === '1') launchURL.searchParams.set('settings', 'updates');
+  window.loadURL(launchURL.href);
   window.on('closed', () => { window = null; });
 }
 
 app.whenReady().then(() => {
   if (!primary) return;
   Menu.setApplicationMenu(Menu.buildFromTemplate([
-    { label: 'Atlas', submenu: [{ role: 'about', label: 'About Atlas' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }] },
+    { label: 'Atlas', submenu: [{ role: 'about', label: 'About Atlas' }, { label: 'Check for Updates…', click: () => { if (window && baseURL) { window.loadURL(new URL('/?settings=updates&checkUpdates=1', baseURL).href); window.show(); window.focus(); } } }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }] },
     { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' }
   ]));
   session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
@@ -47,7 +50,7 @@ app.whenReady().then(() => {
   const logs = path.join(project, 'state'); fs.mkdirSync(logs, { recursive: true });
   const log = fs.openSync(path.join(logs, 'atlas-app.log'), 'a');
   backend = spawn(python, ['-u', path.join(__dirname, 'backend.py')], {
-    cwd: project, env: { ...process.env, ATLAS_PROJECT: project, PYTHONUNBUFFERED: '1', PATH: `/opt/homebrew/bin:${os.homedir()}/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin` },
+    cwd: project, env: { ...process.env, ATLAS_PROJECT: project, ATLAS_APP_BUNDLE: bundle, ATLAS_DESKTOP_PID: String(process.pid), PYTHONUNBUFFERED: '1', PATH: `/opt/homebrew/bin:${os.homedir()}/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin` },
     stdio: ['ignore', 'pipe', log]
   });
   fs.closeSync(log);
@@ -66,4 +69,5 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => app.quit());
+process.on('SIGTERM', () => app.quit());
 app.on('before-quit', () => { exiting = true; if (backend && backend.exitCode === null) backend.kill('SIGTERM'); });

@@ -36,6 +36,7 @@ import job_scan
 import morning_brief
 sys.path.insert(0, str(Path(__file__).parent))
 import discovery
+import updater
 
 # package.json is the one place the version is set; Electron's About box reads it too.
 VERSION = json.loads((Path(__file__).parent / "package.json").read_text())["version"]
@@ -69,6 +70,8 @@ DATA.setdefault("chat", [])
 DATA.setdefault("settings", {"reasoning": "medium"})
 CACHE = gl.load_json(SNAPSHOT, {"news": [], "jobs": [], "weather": [], "mensa": [], "sources": []})
 TRANSLATIONS = gl.load_json(STATE_DIR / "job_translations.json", {})
+UPDATES = updater.Updater(PROJECT.parent, Path(__file__).parent, os.environ.get("ATLAS_APP_BUNDLE"),
+                          int(os.environ.get("ATLAS_DESKTOP_PID", "0")), os.getpid(), state_dir=STATE_DIR)
 _CONFIG = {"mtime": None, "value": {}}
 _HEALTH = {"at": 0.0, "ok": False}
 _ENRICHED = {"source": None, "translations": -1, "jobs": []}
@@ -388,6 +391,7 @@ def public_state():
     result["date"] = today.isoformat()
     result["engine"] = "Hermes Agent"
     result["version"] = VERSION
+    result["updates"] = UPDATES.status()
     result["busy"] = CHAT_LOCK.locked()
     return result
 
@@ -541,6 +545,14 @@ def chat_worker(message_id, message, kind):
 
 
 def api_post(path, body):
+    update = UPDATES.status()
+    if path in ("/api/chat", "/api/brief", "/api/jobs/translate", "/api/model/start") and update["running"] and update.get("phase") != "checking":
+        raise ValueError("Atlas is updating. You can resume AI requests after it restarts.")
+    if path in ("/api/updates/check", "/api/updates/install"):
+        if path.endswith("install") and CHAT_LOCK.locked():
+            raise ValueError("Finish the current request or use Stop Qwen before updating.")
+        UPDATES.launch("check" if path.endswith("check") else "install")
+        return {"ok": True}
     if path == "/api/jobs/translate":
         translate_job_titles()
         return {"ok": True}
@@ -655,11 +667,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"error": "Open Atlas from the app icon."}, 403)
             self.send_response(303)
             self.send_header("Set-Cookie", f"atlas_session={TOKEN}; HttpOnly; SameSite=Strict; Path=/")
-            self.send_header("Location", "/")
+            self.send_header("Location", "/?settings=updates" if urllib.parse.parse_qs(parsed.query).get("settings") == ["updates"] else "/")
             self.end_headers()
             return
         if path == "/api/health":
-            return self.send_json({"ok": True, "app": "Atlas", "version": VERSION})
+            return self.send_json({"ok": True, "app": "Atlas", "version": VERSION, "revision": UPDATES.revision})
         if not self.authenticated():
             return self.send_json({"error": "Open Atlas from the app icon."}, 401)
         if path == "/api/state":
@@ -667,6 +679,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(public_state())
             except Exception as exc:
                 return self.send_json({"error": str(exc)}, 500)
+        if path == "/api/updates/log":
+            log = UPDATES.log_file
+            return self.send_json({"text": log.read_text(errors="replace")[-12000:] if log.exists() else "No update log yet."})
         if path == "/api/logs":
             name = urllib.parse.parse_qs(parsed.query).get("name", ["qwen"])[0]
             logfile = STATE_DIR / ("qwen.log" if name == "qwen" else "hermes-chat.log")
@@ -723,7 +738,7 @@ def maintenance():
             pass
     last_tick = 0
     while not STOP.wait(15):
-        if model_health() and not CHAT_LOCK.locked() and time.time() - last_tick > 60 and any(row["enabled"] for row in schedules()):
+        if not UPDATES.status()["running"] and model_health() and not CHAT_LOCK.locked() and time.time() - last_tick > 60 and any(row["enabled"] for row in schedules()):
             try:
                 with MODEL_LOCK:
                     if MODEL_STOPPING.is_set() or not model_health():

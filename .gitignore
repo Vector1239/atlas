@@ -2,6 +2,7 @@
 node_modules/
 /app/release/
 /app/dist/
+/app/build-info.json
 *.app/
 *.iconset/
 

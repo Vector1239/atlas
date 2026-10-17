@@ -9,9 +9,17 @@ Atlas brings your existing Germany-life project and Hermes Agent into one local 
 - **Events:** ten selected upcoming events in Trier, elsewhere in Germany, and elsewhere in Europe, with English descriptions, dates, venues, official sources, area/type/date filters, and links to full calendars. This is a dated editorial selection checked on 17 October 2026, not a comprehensive live event feed. Expired events disappear and date checks older than two weeks are flagged.
 - **Life admin:** add deadlines and work shifts; see the project's work-day budget.
 - **Ask Atlas:** a persistent Hermes conversation powered by local Qwen.
-- **Settings:** edit your profile, change reasoning effort, start or stop Qwen, manage routines, and check sources.
+- **Settings:** edit your profile, change reasoning effort, start or stop Qwen, manage routines, check sources, and install app updates.
 
-The version (currently 1.1.0) is shown at the bottom of the sidebar and under **Atlas → About Atlas**. It is set in `app/package.json`; bump it there when you change the app.
+The version (currently 1.2.0) is shown at the bottom of the sidebar and under **Atlas → About Atlas**. It is set in `app/package.json`; bump it there when you change the app.
+
+## Updating Atlas
+
+Open **Settings → Updates**, or **Atlas → Check for Updates…** in the Mac menu. Select **Check for updates**, then **Update & restart** when an update is available. Progress and errors appear in the app; the update log is available on the same page.
+
+The updater fetches `main` from the private `Vector1239/atlas` repository and compares its commit with the installed build. It still detects an update if you have already pulled the source, or if a commit did not bump the version. Builds run in a temporary checkout; the app is signed locally, installed and restarted, with the previous app restored if the new app fails its startup check. Personal profiles, chats and other local data stay in place.
+
+Keep the source clone at its configured location, with Node.js, Git and the GitHub CLI installed and signed in. Updates require the checkout to be on `main`, with no uncommitted source changes or diverged commits. The updater only fast-forwards the checkout; it does not discard or stash your work. Nothing is downloaded or installed until you use the update controls. Stop any active AI request before installing; Qwen’s paused/startup preference is preserved.
 
 ## First use
 
@@ -51,7 +59,7 @@ npm run build
 /opt/homebrew/bin/python3.12 backend.py
 ```
 
-For a checkout outside `~/Projects/Atlas`, set `ATLAS_PROJECT` to the absolute path of its `germany-life-hermes` folder before starting the app or service. Run `npm start` from `app/` to open the desktop app, or `npm run package` to create an Apple Silicon app under `app/release/`.
+For a checkout outside `~/Projects/Atlas`, set `ATLAS_PROJECT` to the absolute path of its `germany-life-hermes` folder before starting the app or service. Run `npm start` from `app/` to open the desktop app, or `npm run package` to create an Apple Silicon app under `app/release/`. `npm run build` records the current Git commit in the ignored `app/build-info.json`, which is included in packaged apps for update checks.
 
 For live reload while editing the interface, start the service with `backend.py --port 4317` (or set `ATLAS_PORT` to match), open the launch URL it prints once so the browser gets a session, then run `npm run dev` and open `http://127.0.0.1:4173`.
 

@@ -61,6 +61,25 @@ class AtlasTests(unittest.TestCase):
             urllib.request.urlopen(self.url + '/api/state')
         self.assertEqual(result.exception.code, 401)
 
+    def test_update_install_waits_for_active_request(self):
+        self.backend.CHAT_LOCK.acquire()
+        try:
+            with patch.object(self.backend.UPDATES, 'launch') as launch:
+                with self.assertRaises(urllib.error.HTTPError) as result:
+                    self.post('/api/updates/install', {})
+                self.assertEqual(result.exception.code, 400)
+                launch.assert_not_called()
+        finally:
+            self.backend.CHAT_LOCK.release()
+
+    def test_update_build_blocks_new_ai_work_but_keeps_stop_available(self):
+        with patch.object(self.backend.UPDATES, 'status', return_value={'phase': 'building', 'running': True}), patch.object(self.backend, 'stop_model') as stop:
+            with self.assertRaises(urllib.error.HTTPError) as result:
+                self.post('/api/brief', {})
+            self.assertEqual(result.exception.code, 400)
+            self.post('/api/model/stop', {}).close()
+            stop.assert_called_once()
+
     def test_cross_origin_write_rejected(self):
         with self.assertRaises(urllib.error.HTTPError) as result:
             self.post('/api/profile', {'text': 'should not be saved'}, origin='https://example.com')
