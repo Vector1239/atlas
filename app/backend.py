@@ -396,6 +396,9 @@ def public_state():
     result["news"] = [discovery.enrich_news(item, NEWS_TRANSLATIONS) for item in result.get("news", [])]
     result["news"], result["news_media"] = NEWS_MEDIA.enrich(result["news"])
     result["events"] = discovery.upcoming_events(today)
+    home = config().get("home", {})
+    result["home"] = {"city": home.get("city", "Trier"), "lat": home.get("lat", 49.7499),
+                      "lon": home.get("lon", 6.6371), "precision": "saved base"}
     result["translation"] = TRANSLATION_STATUS.copy()
     labels = ["Bundesagentur für Arbeit", "Arbeitnow"]
     labels += sorted({job["source_label"] for job in result["jobs"]} - set(labels))
@@ -740,7 +743,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", mimetypes.guess_type(candidate.name)[0] or "application/octet-stream")
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.org; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'")
+        self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'")
         self.end_headers()
         self.wfile.write(payload)
 

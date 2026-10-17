@@ -84,6 +84,14 @@ class AtlasTests(unittest.TestCase):
         self.assertEqual(rows[0]['image_alt'], 'Photo credit')
         self.assertEqual(rows[1]['ring'], 2)
 
+    def test_map_home_uses_saved_config_coordinates_and_is_labelled_as_a_saved_base(self):
+        state = self.backend.public_state()
+        configured = self.backend.config()['home']
+        self.assertEqual(state['home']['city'], configured['city'])
+        self.assertEqual(state['home']['lat'], configured['lat'])
+        self.assertEqual(state['home']['lon'], configured['lon'])
+        self.assertEqual(state['home']['precision'], 'saved base')
+
     def test_update_install_waits_for_active_request(self):
         self.backend.CHAT_LOCK.acquire()
         try:
