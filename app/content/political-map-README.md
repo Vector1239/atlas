@@ -8,7 +8,7 @@ Datasets:
 
 - `ne_10m_admin_0_countries`: countries intersecting the European viewing area. Complete country geometry is retained so clipping does not create false borders at the view’s edge.
 - `ne_10m_admin_1_states_provinces`: state/regional outlines in Germany, Austria, Switzerland, the Netherlands and Belgium. All 16 German states are included. German state names are shown where space permits.
-- `ne_50m_populated_places_simple`: major city labels in the viewing area. Job and event city coordinates continue to use the separately verified `places.json` data.
+- `ne_10m_populated_places_simple`: over 1,300 city labels in the viewing area. The renderer supplements these with separately verified `places.json` city coordinates even when they have no visible listings. City names are prioritised around pins, with small city dots and more labels as you zoom in.
 
 Coordinates are rounded to four decimal places. Country polygons are simplified by 0.006 degrees, and state polygons by 0.003 degrees with topology preservation. These are generalised boundaries for browsing at regional scales, not address or navigation geometry. Labels avoid pins and each other; country/state labels are placed within their own polygons.
 

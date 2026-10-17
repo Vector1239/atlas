@@ -7,6 +7,14 @@ const items=[
  {title:'European news',source:'European paper',ring:3,published:'2026-10-17T11:00:00Z'},
  {title:'Undated story',source:'Local paper',ring:0,published:null},
 ];
+test('default news view includes every story, including older, undated and unillustrated stories',()=>{
+ const many=Array.from({length:65},(_,index)=>({...items[index%items.length],title:`Story ${index}`}));
+ const result=selectNews(many,initialNewsFilters,now);
+ assert.equal(result.length,65);
+ assert.equal(new Set(result.map(item=>item.title)).size,65);
+ assert.ok(result.some(item=>!item.picture));
+ assert.ok(result.some(item=>!item.published));
+});
 test('news searches translated and original titles with region, source and photo filters',()=>{
  assert.deepEqual(selectNews(items,{...initialNewsFilters,search:'exhibition',region:'0',source:'Local paper',photos:true},now),[items[0]]);
  assert.equal(selectNews(items,{...initialNewsFilters,search:'Ausstellung'},now).length,1);

@@ -48,7 +48,8 @@
 .political-label{display:flex;align-items:center;justify-content:center;white-space:nowrap;text-align:center;line-height:1.15;color:#728078;text-shadow:0 1px #f9faf7,1px 0 #f9faf7,-1px 0 #f9faf7,0 -1px #f9faf7;pointer-events:none}
 .political-label.country{font-size:11px;letter-spacing:1.6px;font-weight:600;text-transform:uppercase;color:#778880}
 .political-label.state{font-size:10px;color:#7f8d70;font-weight:500}
-.political-label.city{font-size:10px;color:#6d7e76}
+.political-label.city{font-size:11px;color:#566a5b;font-weight:500}
+.political-label.listing-city{font-weight:600;color:#40563c}
 .map-home-button{position:absolute;z-index:700;top:11px;left:54px;display:flex;align-items:center;gap:8px;padding:9px 12px;background:#fffffff5;border:1px solid #d7e1e2;border-radius:5px;color:#427292;box-shadow:0 1px 6px #3752600b;text-align:left}
 .map-home-button strong{display:block;font-size:11px;font-weight:550}
 .map-home-button small{display:block;font-size:8px;color:#94a3a8;margin-top:3px}

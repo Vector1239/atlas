@@ -71,7 +71,7 @@ def main():
         props = row['properties']
         # Keep polygons for label placement; the renderer draws only their outlines.
         states.append(feature(geometry, {'name':props.get('name_en') or props['name'], 'country':props.get('iso_a2'), 'label':[props.get('latitude'),props.get('longitude')]}))
-    for row in source('ne_50m_populated_places_simple', args.cache):
+    for row in source('ne_10m_populated_places_simple', args.cache):
         props = row['properties']
         point = shape(row['geometry'])
         if CLIP.contains(point):

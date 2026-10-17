@@ -3,7 +3,8 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { CrosshairIcon } from '@phosphor-icons/react';
 import basemapURL from '../content/political-map.json?url';
-import { containsPoint, overlapsLabel, withHomeBounds } from './map-view.js';
+import places from '../content/places.json';
+import { cityVisible, mapCities, containsPoint, overlapsLabel, withHomeBounds } from './map-view.js';
 
 export const mapPresets = { trier:[[49.15,5.65],[50.5,8.1]], germany:[[47.1,5.8],[55.05,15.2]], europe:[[37.5,-10.1],[56,18]] };
 const element = (className, text) => { const node=document.createElement('span'); node.className=className; node.textContent=text; return node; };
@@ -40,6 +41,7 @@ export default function DiscoveryMap({ groups, selected, onSelect, onBounds, onH
     let countryFill,stateLines,countryLines;
     fetch(basemapURL,{signal:controller.signal}).then(response=>{if(!response.ok)throw Error('Map unavailable');return response.json();}).then(data=>{
       if(controller.signal.aborted)return; geography.current=data;
+      const cities=mapCities(data.cities,places);
       countryFill=L.geoJSON(data.countries,{pane:'countries',interactive:false,style:feature=>({stroke:false,fillColor:feature.properties.code==='DEU'?'#eff1e9':'#f8f8f4',fillOpacity:1})}).addTo(instance);
       stateLines=L.geoJSON(data.states,{pane:'states',interactive:false,style:{color:'#96a58d',weight:1.25,opacity:.95,dashArray:'4 4',fill:false}}).addTo(instance);
       countryLines=L.geoJSON(data.countries,{pane:'countryBorders',interactive:false,style:{color:'#7a8b84',weight:1.7,opacity:.9,fill:false}}).addTo(instance);
@@ -49,10 +51,14 @@ export default function DiscoveryMap({ groups, selected, onSelect, onBounds, onH
         const bounds=instance.getBounds(),zoom=instance.getZoom(),size=instance.getSize();
         stateLines.setStyle({opacity:zoom>=5?.95:0}); countryLines.setStyle({weight:zoom>=7?2:1.5});
         const hp=instance.latLngToContainerPoint([home.lat,home.lon]);
-        const occupied=[{left:hp.x-50,right:hp.x+70,top:hp.y-20,bottom:hp.y+48}, ...currentGroups.current.map(group=>{const p=instance.latLngToContainerPoint([group.location.lat,group.location.lon]);return{left:p.x-22,right:p.x+22,top:p.y-22,bottom:p.y+22};})];
-        const add=(name,latlon,kind,width,offset=0)=>{
+        const occupied=[{left:0,right:205,top:0,bottom:80},{left:hp.x-50,right:hp.x+70,top:hp.y-20,bottom:hp.y+48}, ...currentGroups.current.map(group=>{
+          const p=instance.latLngToContainerPoint([group.location.lat,group.location.lon]);
+          const nearHome=Math.abs(group.location.lat-home.lat)<.025&&Math.abs(group.location.lon-home.lon)<.025;
+          return{left:p.x-22,right:p.x+22,top:p.y-(nearHome?61:22),bottom:p.y+(nearHome?-17:22)};
+        })];
+        const add=(name,latlon,kind,width,offset=[0,0])=>{
           if(!bounds.contains(latlon))return false;
-          const point=instance.latLngToContainerPoint(latlon); point.x+=offset;
+          const point=instance.latLngToContainerPoint(latlon); point.x+=offset[0]; point.y+=offset[1];
           if(point.x<width/2+12||point.x>size.x-width/2-12||point.y<22||point.y>size.y-25)return false;
           const box=overlapsLabel(point,width,22,occupied); if(!box)return false;
           occupied.push(box);
@@ -72,14 +78,25 @@ export default function DiscoveryMap({ groups, selected, onSelect, onBounds, onH
             if(add(feature.properties.name,point,kind,width))break;
           }
         };
+        const cityLabel=(name,point,listing=false)=>{
+          const width=Math.max(45,name.length*6.2), gap=listing?27:9;
+          for(const offset of [[width/2+gap,0],[-width/2-gap,0],[0,gap+13],[0,-gap-13]]){
+            if(add(name,point,listing?'city listing-city':'city',width,offset))return true;
+          }
+          return false;
+        };
+        for(const group of currentGroups.current){
+          if(Math.abs(group.location.lat-home.lat)<.025&&Math.abs(group.location.lon-home.lon)<.025)continue;
+          cityLabel(group.city,[group.location.lat,group.location.lon],true);
+        }
+        for(const city of cities){
+          if(!cityVisible(city,zoom)||!bounds.contains([city.lat,city.lon]))continue;
+          if(Math.abs(home.lat-city.lat)<.04&&Math.abs(home.lon-city.lon)<.04)continue;
+          if(currentGroups.current.some(group=>Math.abs(group.location.lat-city.lat)<.04&&Math.abs(group.location.lon-city.lon)<.04))continue;
+          if(cityLabel(city.name,[city.lat,city.lon]))L.circleMarker([city.lat,city.lon],{pane:'placeLabels',interactive:false,radius:2.4,color:'#fff',weight:1,fillColor:'#65776a',fillOpacity:1}).addTo(labels.current);
+        }
         if(zoom>=6){for(const feature of data.states.features){if(feature.properties.country==='DE')areaLabel(feature,'state',Math.max(75,feature.properties.name.length*5.3));}}
         for(const feature of data.countries.features)areaLabel(feature,'country',Math.max(55,feature.properties.name.length*(zoom<6?7:7.5)));
-        for(const group of currentGroups.current){const width=Math.max(55,group.city.length*5.6);add(group.city,[group.location.lat,group.location.lon],'city',width,width/2+25);}
-        if(zoom>=5){for(const city of [...data.cities].sort((a,b)=>b.population-a.population)){
-          if(city.population<(zoom>=7?30000:250000))continue;
-          if(currentGroups.current.some(group=>Math.abs(group.location.lat-city.lat)<.08&&Math.abs(group.location.lon-city.lon)<.08))continue;
-          add(city.name,[city.lat,city.lon],'city',Math.max(55,city.name.length*5.8));
-        }}
       };
       setLoaded(true); refreshLabels.current();
     }).catch(error=>{if(error.name!=='AbortError')setOutlineError(true);});

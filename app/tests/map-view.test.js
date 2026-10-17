@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { savedHome, defaultHome, withHomeBounds, containsPoint, overlapsLabel } from '../src/map-view.js';
+import { savedHome, defaultHome, withHomeBounds, containsPoint, overlapsLabel, mapCities, cityVisible } from '../src/map-view.js';
 
 test('home comes from saved city coordinates; invalid locations have an honest fallback',()=>{
  assert.deepEqual(savedHome({city:'Trier',lat:49.7499,lon:6.6371}),defaultHome);
@@ -25,4 +25,17 @@ test('offline map contains European country outlines and all 16 German states',(
  const germany=map.countries.features.find(feature=>feature.properties.code==='DEU');
  assert.ok(containsPoint(germany.geometry,defaultHome));
  assert.ok(map.cities.some(city=>city.name==='Berlin'));
+ assert.ok(map.cities.some(city=>city.name==='Koblenz'));
+ assert.ok(map.cities.some(city=>city.name==='Metz'));
+});
+test('city geography is independent of listings, adds verified towns without duplicates, and scales by zoom',()=>{
+ const cities=[{name:'Berlin',lat:52.52,lon:13.4,population:3500000}];
+ const places={Berlin:{name:'Berlin',lat:52.521,lon:13.401},Wittlich:{name:'Wittlich',lat:49.985,lon:6.887},invalid:{name:'Invalid',lat:Infinity,lon:0}};
+ const result=mapCities(cities,places);
+ assert.deepEqual(result.map(city=>city.name),['Berlin','Wittlich']);
+ assert.equal(cities.length,1);
+ assert.equal(cityVisible(result[0],4),true);
+ assert.equal(cityVisible(result[1],5),false);
+ assert.equal(cityVisible(result[1],9),true);
+ assert.equal(cityVisible({population:100000},7),true);
 });

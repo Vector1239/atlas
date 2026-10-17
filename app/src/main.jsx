@@ -68,7 +68,7 @@ function App() {
     </aside>
     <main className="main">
       <header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-toggle" aria-label="Open navigation" onClick={() => setMobileNav(!mobileNav)}><Icon as={ListIcon} /></button><span>Personal workspace</span><span className="slash">/</span><strong>{nav.find(item => item[0] === page)[1]}</strong></div><div className="topbar-actions">{(data.busy || model.ready || model.loading || stoppingModel) && <Button secondary icon={PauseIcon} disabled={stoppingModel} onClick={stopQwen}>{stoppingModel ? 'Stopping Qwen…' : 'Stop Qwen'}</Button>}<span className="local-label"><span className="dot green" />LOCAL & PRIVATE</span></div></header>
-      <div className={`content ${page === 'chat' ? 'chat-content' : page === 'explore' ? 'explore-content' : ''}`}>
+      <div className={`content ${page === 'chat' ? 'chat-content' : page === 'explore' ? 'explore-content' : page === 'news' ? 'news-content' : ''}`}>
         {(error || loadError) && <div className="alert" role="alert"><Icon as={WarningCircleIcon} /><span>{error || loadError}</span><button className="icon-button" onClick={() => { setError(''); setLoadError(''); }} aria-label="Dismiss error"><Icon as={XIcon} size={16} /></button></div>}
         {page === 'today' && <>
           <SectionHead eyebrow={niceDate(data.date, { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase()} title="Your day, in one place." description="A little less to keep in mind."><Button secondary icon={ArrowClockwiseIcon} disabled={data.refresh.running} onClick={() => act('/api/refresh', {})}>{data.refresh.running ? 'Refreshing…' : 'Refresh sources'}</Button></SectionHead>
