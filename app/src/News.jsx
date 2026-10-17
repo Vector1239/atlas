@@ -35,22 +35,20 @@ export default function News({ data, act, ask }) {
   const translating = data.translation?.running && data.translation.kind === 'news';
   const pictures = data.news.filter(item => item.picture).length;
   const reset = () => setFilters(initialNewsFilters);
-  useEffect(() => {
-    if (panelOpen && !panel.current.open) panel.current.showModal();
-    else if (!panelOpen && panel.current.open) panel.current.close();
-  }, [panelOpen]);
+  const openPanel = () => { if (!panel.current.open) panel.current.showModal(); setPanelOpen(true); };
+  const closePanel = () => { panel.current?.close(); setPanelOpen(false); };
   return <>
     <header className="news-toolbar"><div className="news-title"><h1>News.</h1><span aria-live="polite">{activeFilters ? `${items.length} of ${data.news.length}` : data.news.length} stories</span></div><div className="news-toolbar-actions">
       {!!activeFilters && <button className="text-button news-clear" onClick={reset}>Clear filters</button>}
-      <button className="button secondary" aria-haspopup="dialog" aria-expanded={panelOpen} aria-controls="news-options" onClick={() => setPanelOpen(true)}><SlidersHorizontalIcon size={16} />Filters & display{!!activeFilters && <span className="news-filter-count">{activeFilters}</span>}</button>
+      <button className="button secondary" aria-haspopup="dialog" aria-expanded={panelOpen} aria-controls="news-options" onClick={openPanel}><SlidersHorizontalIcon size={16} />Filters & display{!!activeFilters && <span className="news-filter-count">{activeFilters}</span>}</button>
       <button className="button secondary" disabled={data.refresh.running} onClick={() => act('/api/refresh', {})} aria-label="Refresh news"><ArrowClockwiseIcon size={16} /><span>{data.refresh.running ? 'Refreshing…' : 'Refresh'}</span></button>
     </div></header>
     {!!activeFilters && <div className="news-view-summary">{filters.region !== 'all' ? newsRegions[Number(filters.region)] : 'Everywhere'} · {filters.source !== 'all' ? filters.source : 'All sources'}{filters.search && ` · “${filters.search}”`}{filters.period !== 'all' && ` · Past ${filters.period} hours`}{filters.photos && ' · With images'}{filters.sort === 'newest' && ' · Newest first'}</div>}
     {!!items.length && <section className="news-story-grid" aria-label="News stories">{items.map((item,index) => <Story key={item.url} item={item} original={original} ask={ask} prominent={index < 3} />)}</section>}
     {!items.length && <div className="empty"><NewspaperIcon size={32} /><h3>{data.news.length ? 'No stories match this view.' : 'Your reading starts here.'}</h3><p>{data.news.length ? 'Try another source, region or search.' : 'Refresh news to gather the latest headlines.'}</p><button className="button secondary" onClick={data.news.length ? reset : () => act('/api/refresh', {})} disabled={!data.news.length && data.refresh.running}>{data.news.length ? 'Clear filters' : 'Refresh news'}</button></div>}
     <p className="news-footnote">All {items.length} {items.length === 1 ? 'story' : 'stories'} shown. Images and reporting belong to their publishers; stories without an accessible publisher image are labelled.</p>
-    <dialog ref={panel} id="news-options" className="news-drawer" aria-labelledby="news-options-title" onClose={() => setPanelOpen(false)} onClick={event => { if (event.target === event.currentTarget) setPanelOpen(false); }}>
-      <div className="news-drawer-inner"><header className="news-drawer-heading"><div><h2 id="news-options-title">Your news view</h2><p>{data.news.length} stories from {new Set(data.news.map(item => item.source)).size} sources</p></div><button className="icon-button" aria-label="Close news filters" onClick={() => setPanelOpen(false)}><XIcon size={20} /></button></header>
+    <dialog ref={panel} id="news-options" className="news-drawer" aria-labelledby="news-options-title" onClose={() => { if (!panel.current.open) setPanelOpen(false); }} onClick={event => { if (event.target === event.currentTarget) closePanel(); }}>
+      <div className="news-drawer-inner"><header className="news-drawer-heading"><div><h2 id="news-options-title">Your news view</h2><p>{data.news.length} stories from {new Set(data.news.map(item => item.source)).size} sources</p></div><button type="button" className="icon-button" aria-label="Close news filters" onClick={closePanel}><XIcon size={20} /></button></header>
         <div className="news-drawer-body"><section aria-label="News filters" className="news-drawer-section">
           <label>Search<input autoFocus aria-label="Search news" placeholder="Headlines or sources…" value={filters.search} onChange={event => set('search',event.target.value)} /></label>
           <label>Region<select value={filters.region} onChange={event => set('region',event.target.value)}>{[['all','Everywhere'],['0','Trier'],['1','Region'],['2','Germany'],['3','Europe']].map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select></label>
@@ -65,7 +63,7 @@ export default function News({ data, act, ask }) {
           {data.translation?.kind === 'news' && data.translation.error && <p className="form-error" role="alert">{data.translation.error}</p>}
           <p>{pictures} stories have publisher images.{data.news_media?.running ? ` Finding images… ${data.news_media.completed}/${data.news_media.total}.` : ''} All stories appear by default, including those without an image.</p>
         </section></div>
-        <footer className="news-drawer-footer"><button className="text-button" onClick={reset}>Reset filters</button><button className="button" onClick={() => setPanelOpen(false)}>Show {items.length} {items.length === 1 ? 'story' : 'stories'}</button></footer>
+        <footer className="news-drawer-footer"><button className="text-button" onClick={reset}>Reset filters</button><button className="button" onClick={closePanel}>Show {items.length} {items.length === 1 ? 'story' : 'stories'}</button></footer>
       </div>
     </dialog>
   </>;

@@ -32,6 +32,9 @@
 .news-drawer{position:fixed;inset:0 0 0 auto;margin:0;width:min(410px,100%);height:100dvh;max-height:none;max-width:100%;border:0;border-left:1px solid #dfe4d8;padding:0;background:#fbfbf8;color:#34432e;box-shadow:-8px 0 30px #2632230f}
 .news-drawer[open]{animation:news-slide-in .2s ease-out}
 .news-drawer::backdrop{background:#25302038}
+.news-drawer,.news-drawer *{-webkit-app-region:no-drag}
+.news-drawer-heading>.icon-button{width:44px;height:44px;flex-shrink:0;margin:-10px -10px 0 0}
+.news-drawer-heading>.icon-button svg{pointer-events:none}
 .news-drawer-inner{height:100%;display:flex;flex-direction:column}
 .news-drawer-heading{display:flex;align-items:start;justify-content:space-between;gap:18px;padding:26px 25px 22px;border-bottom:1px solid #e1e5d9}
 .news-drawer-heading h2{font:27px/1.2 Georgia,serif;letter-spacing:-.5px}

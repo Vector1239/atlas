@@ -55,6 +55,11 @@
 .map-home-button small{display:block;font-size:8px;color:#94a3a8;margin-top:3px}
 .map-home-button:hover{background:#f5fbfd}
 .map-home-button.outside{border-color:#a9c3d3}
+.map-detail-button{position:absolute;z-index:700;right:12px;top:11px;padding:9px 12px;background:#fffffff5;border:1px solid #d7e1e2;border-radius:5px;font-size:11px;color:#506548;box-shadow:0 1px 6px #3752600b}
+.map-detail-button:hover{background:#f4f8ef}
+.street-tiles{filter:saturate(.35) contrast(.95) brightness(1.03)}
+.map-street-error{position:absolute;left:12px;right:12px;bottom:35px;z-index:700;width:fit-content;max-width:calc(100% - 24px);background:#fff8e9;color:#79633f;border:1px solid #eadfc8;padding:10px 12px;border-radius:4px;font-size:11px;line-height:1.6}
+.map-street-error button{padding:0 0 0 5px;text-decoration:underline}
 .map-home-button>span:last-child:not(:first-of-type){font-size:16px}
 .map-error,.map-loading{position:absolute;top:75px;left:54px;right:15px;background:#fff8e9;padding:10px;font-size:11px;color:#79633f;border-radius:4px;z-index:700;line-height:1.6}
 .map-loading{width:fit-content;background:#fff;color:#8a9683;right:auto;font-size:10px}

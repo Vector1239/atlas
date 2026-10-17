@@ -10,14 +10,15 @@ export const mapPresets = { trier:[[49.15,5.65],[50.5,8.1]], germany:[[47.1,5.8]
 const element = (className, text) => { const node=document.createElement('span'); node.className=className; node.textContent=text; return node; };
 
 export default function DiscoveryMap({ groups, selected, onSelect, onBounds, onHome, scope, focus, home }) {
-  const host=useRef(null), map=useRef(null), pins=useRef(null), geography=useRef(null), labels=useRef(null), refreshLabels=useRef(()=>{}), callbacks=useRef({onSelect,onBounds,onHome}), currentGroups=useRef(groups);
-  const [outlineError,setOutlineError]=useState(false), [loaded,setLoaded]=useState(false), [attempt,setAttempt]=useState(0), [homeOutside,setHomeOutside]=useState(false);
+  const host=useRef(null), map=useRef(null), pins=useRef(null), geography=useRef(null), labels=useRef(null), streets=useRef(null), refreshLabels=useRef(()=>{}), callbacks=useRef({onSelect,onBounds,onHome}), currentGroups=useRef(groups);
+  const [outlineError,setOutlineError]=useState(false), [loaded,setLoaded]=useState(false), [attempt,setAttempt]=useState(0), [homeOutside,setHomeOutside]=useState(false), [streetView,setStreetView]=useState(false), [streetError,setStreetError]=useState(false);
   callbacks.current={onSelect,onBounds,onHome}; currentGroups.current=groups;
   useEffect(()=>{
-    const instance=L.map(host.current,{scrollWheelZoom:false,minZoom:3,maxZoom:11,maxBounds:[[29,-27],[74,52]],maxBoundsViscosity:.8,zoomSnap:.25}); map.current=instance;
+    const instance=L.map(host.current,{scrollWheelZoom:false,minZoom:3,maxZoom:19,maxBounds:[[29,-27],[74,52]],maxBoundsViscosity:.8,zoomSnap:.25}); map.current=instance;
     instance.attributionControl.setPrefix(false);
     instance.attributionControl.addAttribution('<a href="https://www.naturalearthdata.com/" target="_blank" rel="noreferrer">Natural Earth</a> · Approximate city locations');
     instance.createPane('countries').style.zIndex='210'; instance.createPane('states').style.zIndex='220'; instance.createPane('countryBorders').style.zIndex='230';
+    instance.createPane('streets').style.zIndex='250';
     instance.createPane('placeLabels').style.zIndex='400'; instance.getPane('placeLabels').style.pointerEvents='none';
     instance.createPane('homeMarker').style.zIndex='690';
     pins.current=L.layerGroup().addTo(instance); labels.current=L.layerGroup().addTo(instance);
@@ -27,6 +28,24 @@ export default function DiscoveryMap({ groups, selected, onSelect, onBounds, onH
     instance.fitBounds(withHomeBounds(mapPresets.trier,home),{padding:[45,45],animate:false});
     const resize=new ResizeObserver(()=>instance.invalidateSize()); resize.observe(host.current);
     return ()=>{resize.disconnect(); instance.remove(); map.current=null;};
+  },[home.lat,home.lon]);
+  useEffect(()=>{
+    const instance=map.current; if(!instance)return;
+    // Only request tiles for the city view the user is currently looking at.
+    const layer=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      pane:'streets',className:'street-tiles',minZoom:10,maxZoom:19,maxNativeZoom:19,
+      keepBuffer:1,updateWhenIdle:true,referrerPolicy:'strict-origin-when-cross-origin',
+      attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap contributors</a>'
+    });
+    streets.current=layer;
+    layer.on('tileerror',()=>setStreetError(true));
+    const sync=()=>{
+      const active=instance.getZoom()>=10; setStreetView(active);
+      if(active&&!instance.hasLayer(layer)){setStreetError(false);layer.addTo(instance);}
+      else if(!active&&instance.hasLayer(layer)){layer.remove();setStreetError(false);}
+    };
+    instance.on('zoomend',sync); sync();
+    return()=>{instance.off('zoomend',sync);layer.remove();streets.current=null;};
   },[home.lat,home.lon]);
   useEffect(()=>{
     const instance=map.current; if(!instance)return;
@@ -49,6 +68,7 @@ export default function DiscoveryMap({ groups, selected, onSelect, onBounds, onH
         if(!map.current || !labels.current)return;
         labels.current.clearLayers();
         const bounds=instance.getBounds(),zoom=instance.getZoom(),size=instance.getSize();
+        if(zoom>=10)return; // Street tiles provide their own city, neighbourhood and street labels.
         stateLines.setStyle({opacity:zoom>=5?.95:0}); countryLines.setStyle({weight:zoom>=7?2:1.5});
         const hp=instance.latLngToContainerPoint([home.lat,home.lon]);
         const occupied=[{left:0,right:205,top:0,bottom:80},{left:hp.x-50,right:hp.x+70,top:hp.y-20,bottom:hp.y+48}, ...currentGroups.current.map(group=>{
@@ -112,8 +132,15 @@ export default function DiscoveryMap({ groups, selected, onSelect, onBounds, onH
       marker.bindTooltip(element('',`${group.city} · ${group.jobs} jobs · ${group.events} events`),{direction:'top'}).on('click',()=>callbacks.current.onSelect(group)).addTo(pins.current);
     }); refreshLabels.current();
   },[groups,selected,home.lat,home.lon]);
-  return <div className="explore-map-wrap"><div className="explore-map" ref={host} role="region" aria-label="Political map of jobs and events, with country and state borders and your saved home location. Use arrow keys to pan, plus and minus to zoom." />
+  function showCity() {
+    if(streetView){callbacks.current.onHome();return;}
+    const target=groups.find(group=>group.key===selected)?.location || home;
+    map.current?.setView([target.lat,target.lon],14,{animate:false});
+  }
+  return <div className="explore-map-wrap"><div className="explore-map" ref={host} role="region" aria-label="Map of jobs and events, with country and state borders, city streets when zoomed in, and your saved home location. Use arrow keys to pan, plus and minus to zoom." />
     <button className={`map-home-button ${homeOutside?'outside':''}`} onClick={()=>callbacks.current.onHome()} title={`Return to your saved base in ${home.city}. This is a city location, not live GPS.`}><CrosshairIcon size={17} weight="bold" /><span><strong>Home · {home.city}</strong><small>{homeOutside?'Outside this view · back to home':'Saved city location'}</small></span>{homeOutside&&<span aria-hidden="true">↗</span>}</button>
+    <button className="map-detail-button" onClick={showCity}>{streetView?'Regional map':'City streets'}</button>
+    {streetView&&streetError&&<div className="map-street-error" role="status">Street detail couldn’t load. Check your connection. <button onClick={()=>{setStreetError(false);streets.current?.redraw();}}>Retry streets</button></div>}
     {!loaded&&!outlineError&&<div className="map-loading" role="status">Loading map…</div>}
     {outlineError&&<div className="map-error" role="status">Map outlines couldn’t load. Listings remain available. <button onClick={()=>setAttempt(value=>value+1)}>Retry map</button></div>}
   </div>;

@@ -75,6 +75,48 @@ class NewsMediaTests(unittest.TestCase):
     def test_opaque_google_links_never_substitute_a_google_logo(self):
         self.assertIsNone(media.article_url({'url':'https://news.google.com/rss/articles/CBMiOpaqueLink'}))
         self.assertEqual(media.article_url({'url':'https://news.google.com/rss/articles/opaque', 'article_url':'https://publisher.example/article'}), 'https://publisher.example/article')
+        self.assertIsNone(media.image_metadata('<meta property="og:image" content="https://lh3.googleusercontent.com/generic-google-news-logo">', 'https://news.google.com/articles/CBMiOpaqueLink'))
+
+    def test_google_reader_resolves_only_the_matching_story_and_uses_its_publisher_photo(self):
+        url = 'https://news.google.com/rss/articles/CBMiOpaqueLink'
+        params = b'<div data-n-a-id="CBMiOpaqueLink" data-n-a-ts="1792255656" data-n-a-sg="signature"></div>'
+        rpc = json.dumps([['wrb.fr', 'Fbv4je', json.dumps(['garturlres', 'https://publisher.example/exact-story', 1])]]).encode()
+        photo = b'\xff\xd8\xff' + b'x'*1024
+        responses = [(params, 'text/html', url), (b")]}'\n\n" + rpc, 'application/json', 'https://news.google.com/'),
+                     (b'<meta property="og:image" content="/exact-story.jpg">', 'text/html', 'https://publisher.example/exact-story'), (photo, 'image/jpeg', 'https://publisher.example/exact-story.jpg')]
+        with tempfile.TemporaryDirectory() as folder, patch.object(media, 'fetch_public', side_effect=responses) as fetch:
+            result = media.NewsMedia(folder)._load({'url':url, 'source':'Publisher'})
+            self.assertEqual(result['article_url'], 'https://publisher.example/exact-story')
+            self.assertEqual(result['key'], hashlib.sha256(photo).hexdigest())
+            form = media.urllib.parse.parse_qs(fetch.call_args_list[1].kwargs['form'].decode())
+            payload = json.loads(json.loads(form['f.req'][0])[0][0][1])
+            self.assertEqual(payload[2], 'CBMiOpaqueLink')
+            self.assertEqual(fetch.call_args_list[2].args[0], result['article_url'])
+        with patch.object(media, 'fetch_public', return_value=(params.replace(b'CBMiOpaqueLink', b'CBMiDifferentStory'), 'text/html', url)) as fetch:
+            with self.assertRaisesRegex(ValueError, 'publisher link'):
+                media.resolve_google_article(url)
+            self.assertEqual(fetch.call_count, 1)
+
+    def test_google_rate_limit_backs_off_and_keeps_stories_available_without_photos(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(media, 'resolve_google_article', side_effect=ValueError('Preview unavailable (429).')) as resolve:
+            cache = media.NewsMedia(folder)
+            item = {'url':'https://news.google.com/rss/articles/CBMiOpaqueLink', 'source':'Publisher'}
+            self.assertEqual(cache._load(item), {})
+            self.assertEqual(cache._load(item), {})
+            self.assertEqual(resolve.call_count, 1)
+            self.assertGreater(cache.google_backoff, time.monotonic())
+            self.assertEqual(cache.enrich([item])[0][0]['url'], item['url'])
+
+    def test_resolved_publisher_url_survives_blocked_photo_and_is_reused(self):
+        url = 'https://news.google.com/rss/articles/CBMiOpaqueLink'
+        with tempfile.TemporaryDirectory() as folder, patch.object(media, 'resolve_google_article', return_value='https://publisher.example/story'), patch.object(media, 'fetch_public', side_effect=ValueError('Preview unavailable (403).')):
+            cache = media.NewsMedia(folder)
+            result = cache._load({'url':url})
+            self.assertEqual(result, {'article_url':'https://publisher.example/story'})
+            cache.index[url] = result
+            rows, _ = cache.enrich([{'url':url}])
+            self.assertEqual(rows[0]['article_url'], result['article_url'])
+            self.assertIsNone(rows[0]['picture'])
 
 
 if __name__ == '__main__': unittest.main()

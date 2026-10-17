@@ -1,6 +1,6 @@
 # Political basemap
 
-`political-map.json` is a bundled, simplified European basemap. It does not use remote map tiles, imagery, vegetation or road detail.
+`political-map.json` is a bundled, simplified European basemap. At regional scales it does not use remote map tiles, imagery, vegetation or road detail. At city zoom (10–19), the renderer adds online OpenStreetMap tiles for streets, neighbourhoods and buildings; this JSON remains the regional/offline fallback. OpenStreetMap attribution is visible while its layer is shown. Only currently viewed tiles are requested, using the browser’s HTTP cache. See the [tile usage policy](https://operations.osmfoundation.org/policies/tiles/).
 
 Source: [Natural Earth](https://www.naturalearthdata.com/), [public domain](https://www.naturalearthdata.com/about/terms-of-use/). Source revision: `ca96624a56bd078437bca8184e78163e5039ad19` from the [maintainer’s vector repository](https://github.com/nvkelso/natural-earth-vector).
 
