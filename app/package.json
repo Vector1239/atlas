@@ -1,7 +1,7 @@
 {
   "name": "atlas-local",
-  "version": "1.7.0",
-  "description": "Your local life assistant, powered by Hermes and Qwen",
+  "version": "1.8.0",
+  "description": "Your local life assistant, powered by Hermes and Gemma",
   "private": true,
   "type": "module",
   "main": "desktop.cjs",

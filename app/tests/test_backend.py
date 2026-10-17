@@ -61,6 +61,37 @@ class AtlasTests(unittest.TestCase):
             urllib.request.urlopen(self.url + '/api/state')
         self.assertEqual(result.exception.code, 401)
 
+    def test_briefs_use_fresh_tool_free_hermes_and_chat_keeps_its_tools(self):
+        brief = self.backend.hermes_arguments('brief')
+        self.assertEqual(brief[brief.index('--model')+1], 'atlas-local')
+        self.assertEqual(brief[brief.index('--reasoning')+1], 'none')
+        self.assertEqual(brief[brief.index('--toolsets')+1], 'none')
+        self.assertEqual(brief[brief.index('--max-turns')+1], '1')
+        self.assertNotIn('--continue', brief)
+        self.assertNotIn('--resume', brief)
+        chat = self.backend.hermes_arguments('chat')
+        self.assertIn('--continue', chat)
+        self.assertEqual(chat[chat.index('--toolsets')+1], 'terminal,skills,memory')
+
+    def test_compact_brief_keeps_each_region_links_and_translations_without_image_metadata(self):
+        rows = [{'title':f'Story {ring}-{i}', 'url':f'https://source.example/{ring}/{i}', 'ring':ring, 'source':'Publisher', 'lang':'en', 'image':'https://source.example/large-image.jpg'} for ring in range(4) for i in range(6)]
+        with patch.dict(self.backend.CACHE, {'news':rows}):
+            brief = self.backend.brief_news()
+        self.assertEqual(len(brief), 16)
+        self.assertEqual({row['ring'] for row in brief}, {0,1,2,3})
+        self.assertTrue(all(row['url'].startswith('https://source.example/') for row in brief))
+        self.assertTrue(all('image' not in row for row in brief))
+        self.assertIn('image', rows[0])
+
+    def test_brief_source_references_attach_only_original_known_links(self):
+        rows = [{'url':'https://publisher.example/article_(original)'}, {'url':'https://other.example/story'}]
+        text = 'A [translated headline][news-0]. Another [unknown][news-99].'
+        result = self.backend.attach_brief_links(text, rows)
+        self.assertIn('[news-0]: <https://publisher.example/article_(original)>', result)
+        self.assertNotIn('[news-99]:', result)
+        self.assertNotIn('https://other.example', result)
+        self.assertEqual(rows[0]['url'], 'https://publisher.example/article_(original)')
+
     def test_article_images_require_auth_and_only_serve_the_owned_cache(self):
         path = '/api/news/images/' + 'a' * 64
         with self.assertRaises(urllib.error.HTTPError) as result:
@@ -159,9 +190,10 @@ class AtlasTests(unittest.TestCase):
             (data / 'deadlines.toml').write_text(good)
 
     def test_unsupported_reasoning_is_rejected(self):
+        previous = self.backend.DATA['settings']['reasoning']
         with self.assertRaises(urllib.error.HTTPError):
             self.post('/api/settings', {'reasoning': 'made-up'})
-        self.assertEqual(self.backend.DATA['settings']['reasoning'], 'medium')
+        self.assertEqual(self.backend.DATA['settings']['reasoning'], previous)
 
     def test_translation_does_not_start_a_paused_model(self):
         with patch.object(self.backend, 'model_health', return_value=False), patch.object(self.backend, 'start_model') as start:
