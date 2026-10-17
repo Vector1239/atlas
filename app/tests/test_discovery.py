@@ -32,6 +32,16 @@ class DiscoveryTests(unittest.TestCase):
         self.assertLess(discovery.city_location('Simmern, Hunsrück')['lat'], 50)
         self.assertIsNotNone(discovery.city_location('Eindhoven', 'Netherlands'))
 
+    def test_headline_translation_survives_known_publisher_suffix_without_merging_different_stories(self):
+        title = 'Trier, Eifel, Mosel: Die Events-Tipps fürs Wochenende – Von Dinosauriern bis zu Musik-Highlights'
+        original = title + ' - Volksfreund'
+        row = discovery.enrich_news({'title': original, 'source':'Volksfreund', 'lang':'de'})
+        self.assertEqual(row['title'], original)
+        self.assertFalse(row['translation_needed'])
+        self.assertIn('Weekend event tips', row['title_en'])
+        other = discovery.enrich_news({'title':'Neue Ausstellung - neue Preise', 'source':'The Paper', 'lang':'de'}, {'Neue Ausstellung - neues Museum':'New exhibition — new museum'})
+        self.assertTrue(other['translation_needed'])
+
     def test_legacy_location_becomes_numeric_filterable_distance(self):
         row = discovery.enrich_job({'title': 'Data Engineer', 'where': 'Trier, RHEINLAND_PFALZ (1,5 km)', 'source': 'Bundesagentur'})
         self.assertEqual(row['city'], 'Trier')

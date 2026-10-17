@@ -25,6 +25,16 @@ def city_location(city, country="Germany"):
 def enrich_news(item, translations=None):
     title = item["title"]
     translated = (translations or {}).get(title) or NEWS_TRANSLATIONS.get(title)
+    if not translated and item.get("source"):
+        # RSS aggregators append the publisher to an otherwise identical title.
+        # Reuse a translation only when that suffix matches this known publisher.
+        suffix = " - " + item["source"]
+        core = title[:-len(suffix)] if title.casefold().endswith(suffix.casefold()) else title
+        candidates = {core.casefold(), (core + suffix).casefold()}
+        for cache in (translations or {}, NEWS_TRANSLATIONS):
+            translated = next((english for original, english in cache.items() if original.casefold() in candidates), None)
+            if translated:
+                break
     # Feed language describes the source, not necessarily each individual headline.
     german = re.search(r"[äöüß]|\b(?:der|die|das|für|und|im|zum|zur|mit|nach|bei|von|wird|werden|wer|suche|zehn|neue|neues|erneut|ohne|wegen)\b", title, re.I)
     english = re.search(r"\b(?:the|a|an|is|are|for|to|of|in|on|with|how|what|where|i|my|looking|says)\b", title, re.I)
