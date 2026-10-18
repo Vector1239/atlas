@@ -179,6 +179,34 @@ class AtlasTests(unittest.TestCase):
         self.assertNotIn('https://other.example', result)
         self.assertEqual(rows[0]['url'], 'https://publisher.example/article_(original)')
 
+    def test_ticketmaster_events_get_venue_pins_skip_cancelled_and_keep_the_key_out_of_the_cache(self):
+        events = self.backend.event_sources
+        today = self.backend.dt.date.today()
+        day = (today + self.backend.dt.timedelta(days=3)).isoformat()
+        venue = lambda city, code, lat, lon: {'_embedded': {'venues': [{'name': f'{city} Arena', 'city': {'name': city},
+                                                       'country': {'name': city, 'countryCode': code}, 'location': {'latitude': str(lat), 'longitude': str(lon)}}]}}
+        page = {'_embedded': {'events': [
+            {'id': 'a', 'name': 'Concert in Trier', 'url': 'https://www.ticketmaster.de/event/a', 'dates': {'start': {'localDate': day, 'localTime': '20:00:00'}, 'status': {'code': 'onsale'}},
+             'classifications': [{'segment': {'name': 'Music'}, 'genre': {'name': 'Rock'}}], 'priceRanges': [{'currency': 'EUR', 'min': 25, 'max': 40}], **venue('Trier', 'DE', 49.75, 6.64)},
+            {'id': 'b', 'name': 'Cancelled show', 'url': 'https://www.ticketmaster.de/event/b', 'dates': {'start': {'localDate': day}, 'status': {'code': 'cancelled'}}, **venue('Berlin', 'DE', 52.5, 13.4)},
+            {'id': 'c', 'name': 'Play in Vienna', 'url': 'https://www.ticketmaster.at/event/c', 'dates': {'start': {'localDate': day}, 'status': {'code': 'onsale'}},
+             'classifications': [{'segment': {'name': 'Arts & Theatre'}}], **venue('Vienna', 'AT', 48.2, 16.37)}]}}
+        with tempfile.TemporaryDirectory() as folder:
+            state = Path(folder)
+            events.save_key(state, 'secret-consumer-key')
+            calls = []
+            fetch = lambda url, **_: calls.append(url) or page
+            cache = events.refresh(state, {'lat': 49.7499, 'lon': 6.6371}, today, fetch=fetch, pause=0)
+            self.assertEqual(len(calls), 1 + len(events.GERMANY) + len(events.EUROPE))
+            self.assertEqual([(e['title'], e['area'], e['category'], e['price']) for e in cache['events']],
+                             [('Concert in Trier', 'Trier', 'Music', '€25–€40'), ('Play in Vienna', 'Europe', 'Culture', 'Tickets on Ticketmaster')])
+            self.assertEqual(cache['events'][0]['location']['lat'], 49.75)
+            self.assertNotIn('secret-consumer-key', (state / 'live_events.json').read_text())
+            events.refresh(state, {'lat': 49.7499, 'lon': 6.6371}, today, fetch=fetch, pause=0)
+            self.assertEqual(len(calls), 1 + len(events.GERMANY) + len(events.EUROPE))  # cached for 12 hours
+            merged = self.backend.discovery.upcoming_events(today, cache['events'])['items']
+            self.assertIn('Concert in Trier', [row['title'] for row in merged])
+
     def test_brief_links_jobs_and_events_by_their_real_titles(self):
         jobs = [{'title': 'Werkstudent Data Science', 'url': 'https://jobs.example/1'}]
         events = [{'title': 'Autumn theatre', 'url': 'https://events.example/1'}]
