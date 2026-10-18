@@ -1,7 +1,7 @@
 ---
 name: trier-morning-brief
 description: Turn the MORNING DATA block (weather, Mensa, deadlines, work days, news from Trier, the region, Germany and Europe) into a short English morning brief for an international MSc Data Science student in Trier. Use for the scheduled morning brief, or when the user asks what's new today.
-version: 0.1.0
+version: 0.2.0
 metadata:
   hermes:
     tags: [germany, trier, news, briefing]
@@ -33,11 +33,14 @@ metadata:
    🇱🇺 **Region**: 1–3 items
    🇩🇪 **Germany**: 2–3 items
    🇪🇺 **Europe**: 1–2 items
+   💼 **Jobs**: only if the data has a jobs section; one line on the market from its numbers,
+      then up to 2 standout roles (new ones first), each with why it fits the PROFILE
+   🎟️ **Events**: only if the data lists events this week; up to 2, with day and place
    🍽️ **Mensa**: one line, two student-priced dishes, only if a canteen is open
    🧮 Work days: one line, only if 100 or more of the 140 are used
 
    Each news item is one line: `• <English headline>: <why it matters, ≤12 words> <link>`.
-6. Keep the whole message under about 300 words.
+6. Keep the whole message under about 350 words. Never invent job numbers: use only counts given in the data.
 7. If half or more of the sources in SOURCE STATUS failed, end with one line:
    `⚠️ Sources down: <names>` so the user can run `./gl check`.
 
