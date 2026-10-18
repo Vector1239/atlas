@@ -65,6 +65,11 @@ backend they run in a container that can only see this project folder.
    `~/.hermes/config.yaml` under `terminal:` (`open -e ~/.hermes/config.yaml`), then run
    `hermes gateway restart`. The agent sees only the scripts, config, your profile (read-only) and `data/`; `state/`, with your chats and saved API keys, stays out of its reach.
 
+For Atlas’s local Gemma server, keep `model.context_length` unset for auto-detection,
+or set it to `65536`. Check with `hermes config get model.context_length`; after
+changing it, restart the gateway. Restart Gemma from Atlas Settings after changing
+the app’s model context.
+
 Skipping Docker for now is fine. Run `./install.sh local` in the next step instead, and leave
 Hermes' approval prompts on (`approvals.mode: smart`, the default).
 
