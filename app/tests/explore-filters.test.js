@@ -18,6 +18,8 @@ test('layer, radius and event dates combine without treating unknown distance as
  assert.deepEqual(selectExplore(data,{...initialFilters,distance:'25'}).map(i=>i.id),['j1','e1']);
  assert.equal(selectExplore(data,{...initialFilters,kind:'jobs',group:'saved'}).length,1);
  assert.equal(selectExplore(data,{...initialFilters,kind:'events',category:'Culture'}).length,0);
+ const remote={...data,jobs:[...data.jobs,{...job,id:'r1',city:'Remote',location:null,distance_from_trier:null,remote:true}]};
+ assert.deepEqual(selectExplore(remote,{...initialFilters,kind:'remote',distance:'25'}).map(i=>i.id),['r1']);
  assert.equal(cityDistance(trier),0);
  assert.ok(cityDistance(berlin)>500);
 });

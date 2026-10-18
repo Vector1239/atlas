@@ -1,7 +1,7 @@
 ---
 name: job-scan
-description: Rank fresh job postings (Bundesagentur für Arbeit, Arbeitnow, optional JSearch) for an international MSc Data Science student at Uni Trier, and save 👍/👎 feedback on jobs by their J-xxxxx id. Use for the scheduled job-scan cron jobs, when the user asks for jobs, or when the user replies to a job with 👍, 👎 or a J-xxxxx id.
-version: 0.1.0
+description: Rank fresh job postings (Bundesagentur für Arbeit, Arbeitnow, remote boards, optional JSearch) in data, AI and software engineering (full stack, backend, mobile; no cybersecurity) for an international MSc Data Science student at Uni Trier, and save 👍/👎 feedback on jobs by their J-xxxxx id. Use for the scheduled job-scan cron jobs, when the user asks for jobs, or when the user replies to a job with 👍, 👎 or a J-xxxxx id.
+version: 0.2.0
 metadata:
   hermes:
     tags: [germany, jobs, career, data-science]

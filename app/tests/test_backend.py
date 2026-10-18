@@ -84,7 +84,8 @@ class AtlasTests(unittest.TestCase):
         with patch.dict(b.CACHE,{'jobs':[cached],'news':[]}), patch.object(b,'config',return_value=cfg), \
                 patch.object(b.morning_brief,'weather',return_value=[]), patch.object(b.morning_brief,'mensa',return_value=[]), \
                 patch.object(b.NEWS_MEDIA,'start'), patch.object(b.job_scan,'fetch_bundesagentur',return_value=[free]), \
-                patch.object(b.job_scan,'fetch_arbeitnow',return_value=[]), patch.object(b.job_scan,'fetch_jsearch',return_value=[]) as paid:
+                patch.object(b.job_scan,'fetch_arbeitnow',return_value=[]), patch.object(b.job_scan,'fetch_jsearch',return_value=[]) as paid, \
+                patch.object(b.job_scan,'fetch_remote',return_value=[]):
             b.refresh_data()
             self.assertEqual(b.REFRESH_STATUS['error'],'')
             self.assertEqual({job['source'] for job in b.CACHE['jobs']},{'JSearch','Bundesagentur'})
@@ -197,6 +198,7 @@ class AtlasTests(unittest.TestCase):
                 {'id': '3', 'title': 'Datenanalyst', 'flags': [], 'city': 'Trier', 'text': ''}]
         market = insights.analyze(jobs, '## Skills\n- Strong: <e.g. Spark> Python, SQL\n- Learning: Spark\n## Other\nAWS')
         self.assertEqual([row['name'] for row in market['families']], ['Data science', 'Data engineering', 'Analytics & BI'])
+        self.assertEqual([insights.family({'title': t}) for t in ('Flutter App Entwickler', 'Full Stack Developer', 'AI Engineer')], ['Mobile', 'Full stack & frontend', 'ML & AI'])
         self.assertEqual((market['total'], market['described']), (3, 2))
         self.assertEqual({row['name']: row['count'] for row in market['skills']}, {'Python': 2, 'SQL': 1, 'Spark': 1})
         self.assertEqual(market['gaps'], ['Spark'])

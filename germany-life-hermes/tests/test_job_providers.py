@@ -163,3 +163,38 @@ print(json.dumps(job_providers.provider_state()))
             self.assertEqual(providers.bundesagentur_description("10000-test-S"), "Full requirements")
         self.assertIn("/pc/v4/jobdetails/MTAwMDAtdGVzdC1T", request.call_args.args[0])
         self.assertEqual(request.call_args.kwargs["headers"]["X-API-Key"], "jobboerse-jobsuche")
+
+    def test_remote_boards_keep_roles_open_to_germany_link_back_and_cache_for_hours(self):
+        import remote_boards
+        today = dt.date.today().isoformat()
+        remotive = {"jobs": [
+            {"id": 1, "url": "https://remotive.com/remote-jobs/data/1", "title": "Data Scientist", "company_name": "A",
+             "candidate_required_location": "Europe", "publication_date": today, "description": "<p>Python</p>", "salary": "€60k"},
+            {"id": 2, "url": "https://remotive.com/remote-jobs/data/2", "title": "Data Analyst", "company_name": "B",
+             "candidate_required_location": "USA Only", "publication_date": today, "description": "SQL"}]}
+        jobicy = {"jobs": [{"id": 3, "url": "https://jobicy.com/jobs/3", "jobTitle": "Machine Learning Engineer", "companyName": "C",
+                            "jobGeo": "Germany", "pubDate": today, "jobDescription": "PyTorch", "salaryMin": 50000,
+                            "salaryMax": 70000, "salaryCurrency": "EUR", "salaryPeriod": "yearly"}]}
+        stamp = dt.datetime.now(dt.timezone.utc).timestamp()
+        himalayas = {"jobs": [
+            {"guid": "https://himalayas.app/companies/d/jobs/4", "title": "Data Engineer", "companyName": "US startup",
+             "locationRestrictions": [], "pubDate": stamp, "expiryDate": stamp + 86400, "description": "Spark",
+             "minSalary": 40, "maxSalary": 60, "currency": "USD", "salaryPeriod": "hourly"},
+            {"guid": "https://himalayas.app/companies/e/jobs/5", "title": "Data Analyst", "companyName": "E",
+             "locationRestrictions": ["United States"], "pubDate": stamp, "description": "SQL"}]}
+        cfg = {"jobs": {"include": ["data", "machine learning"], "remote": {"remotive_categories": ["data"],
+                                                                            "jobicy_industries": ["data-science"], "jobicy_geos": ["europe"],
+                                                                            "himalayas_queries": ["data"]}}}
+        boards = {"remotive": remotive, "jobicy": jobicy, "himalayas": himalayas}
+        with patch.object(gl, "http_json", side_effect=lambda url, **_: next(v for k, v in boards.items() if k in url)) as fetch:
+            status = []
+            jobs = remote_boards.fetch_remote(cfg, {2, 3}, job_scan.Matcher(cfg["jobs"]), status)
+            remote_boards.fetch_remote(cfg, {2, 3}, job_scan.Matcher(cfg["jobs"]), [])
+            self.assertEqual(fetch.call_count, 3)  # the second scan is served from the 12-hour cache
+            self.assertEqual(remote_boards.fetch_remote(cfg, {0, 1}, job_scan.Matcher(cfg["jobs"]), []), [])
+        self.assertEqual([(j["source"], j["url"], j["ring"]) for j in jobs],
+                         [("Remotive", "https://remotive.com/remote-jobs/data/1", 3), ("Jobicy", "https://jobicy.com/jobs/3", 2),
+                          ("Himalayas", "https://himalayas.app/companies/d/jobs/4", 3)])
+        self.assertTrue(all(j["remote"] and j["city"] == "Remote" for j in jobs))
+        self.assertEqual((jobs[1]["salary"]["period"], jobs[2]["salary"]["period"], jobs[2]["remote_scope"]), ("YEAR", "HOUR", "Worldwide"))
+        self.assertIn("2 that hire only elsewhere", status[0])

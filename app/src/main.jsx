@@ -50,7 +50,7 @@ function App() {
     finally { setStoppingModel(false); }
   }
   async function ask(text) { const result = await act('/api/chat', { text }); if (result) setPage('chat'); }
-  function navigate(next) { if (next === 'jobs' || next === 'events') { setExploreKind(next); next = 'explore'; } else if (next === 'explore') setExploreKind('all'); setPage(next); setMobileNav(false); setError(''); }
+  function navigate(next) { if (['jobs', 'remote', 'events'].includes(next)) { setExploreKind(next); next = 'explore'; } else if (next === 'explore') setExploreKind('all'); setPage(next); setMobileNav(false); setError(''); }
   async function saveForm(e) {
     e.preventDefault(); setSaving(true);
     const body = Object.fromEntries(new FormData(e.currentTarget));
@@ -97,7 +97,7 @@ function App() {
         {page === 'news' && <News data={data} act={act} ask={ask} />}
         {page === 'tech' && <Tech data={data} act={act} ask={ask} />}
         {page === 'explore' && <Explore data={data} act={act} ask={ask} initialKind={exploreKind} />}
-        {page === 'market' && <JobMarket data={data} act={act} />}
+        {page === 'market' && <JobMarket data={data} act={act} navigate={navigate} />}
         {page === 'admin' && <Admin data={data} setModal={setModal} />}
         {page === 'chat' && <Chat data={data} ask={ask} act={act} />}
         {page === 'settings' && <Settings data={data} act={act} setNotice={setNotice} stopModel={stopModel} stoppingModel={stoppingModel} />}

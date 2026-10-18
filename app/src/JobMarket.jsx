@@ -48,7 +48,7 @@ function Takeaways({ data, act }) {
   </section>;
 }
 
-export default function JobMarket({ data, act }) {
+export default function JobMarket({ data, act, navigate }) {
   const market = data.job_market, described = market.described;
   if (!market.total) return <><div className="page-heading"><div><div className="eyebrow">WHAT THE LISTINGS SAY</div><h1>Your job market.</h1></div></div><div className="empty"><h3>No listings yet.</h3><p>{data.refresh.running ? 'Your job sources are being checked.' : 'Refresh your sources to see which roles, skills and pay are out there.'}</p></div></>;
   const student = payTile(market.pay.hourly, hourly, 'No posting lists an hourly rate yet'), salary = payTile(market.pay.annual, yearly, 'No posting lists a salary yet');
@@ -95,7 +95,7 @@ export default function JobMarket({ data, act }) {
           <div><dt>German required</dt><dd>{share(market.language.german_required, described)}<small>{market.language.german_required} of {described} described</small></dd></div>
           <div><dt>Posting written in German</dt><dd>{share(market.language.posting_in_german, described)}<small>{market.language.posting_in_german} of {described}</small></dd></div>
           <div><dt>Posting in English</dt><dd>{share(market.language.english, described)}<small>{market.language.english} of {described}</small></dd></div>
-          <div><dt>Remote or hybrid</dt><dd>{share(market.remote, market.total)}<small>{market.remote} of {market.total} roles</small></dd></div>
+          <div><dt>Remote or hybrid{market.remote > 0 && <button className="text-button" onClick={() => navigate('remote')}>See remote roles</button>}</dt><dd>{share(market.remote, market.total)}<small>{market.remote} of {market.total} roles</small></dd></div>
           <div><dt>Visa sponsorship listed</dt><dd>{share(market.visa, market.total)}<small>{market.visa} of {market.total} roles</small></dd></div>
         </dl>
         {market.companies.length > 0 && <><h3 className="market-subhead">Hiring more than once</h3><div className="tags">{market.companies.map(row => <span className="badge" key={row.name}>{row.name} · {row.count}</span>)}</div></>}

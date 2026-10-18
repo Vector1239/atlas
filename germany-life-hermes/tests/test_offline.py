@@ -180,6 +180,9 @@ class JobScanTests(ProjectCase):
         self.assertEqual(jobs[0]["posted"], TODAY.isoformat())
         self.assertTrue(jobs[0]["remote"])
         self.assertTrue(jobs[0]["url"].endswith("/10000-current-S"))
+        matcher = job_scan.Matcher(cfg["jobs"])  # software roles count; cybersecurity doesn't
+        self.assertTrue(all(map(matcher.relevant, ["Junior Full Stack Developer", "Flutter App Entwickler", "AI Engineer"])))
+        self.assertFalse(any(map(matcher.relevant, ["Cyber Security Analyst", "IT-Sicherheitsbeauftragter", "Mobile Sales Manager"])))
 
     def test_filters_flags_and_dedupe_across_runs(self):
         net = self.use_net(FakeNet(self.routes()))

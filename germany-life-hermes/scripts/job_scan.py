@@ -20,6 +20,7 @@ import urllib.parse
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gl_common as gl  # noqa: E402
 from job_providers import fetch_jsearch  # noqa: E402
+from remote_boards import fetch_remote  # noqa: E402
 
 RING_NAMES = {0: "Trier", 1: "Region", 2: "Germany", 3: "Europe"}
 BA_URL = "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v6/jobs"
@@ -217,7 +218,8 @@ def run(rings: set[int], dry_run: bool) -> str:
     status: list[str] = []
     jobs = (fetch_bundesagentur(cfg, rings, matcher, status)
             + fetch_arbeitnow(cfg, rings, matcher, status)
-            + fetch_jsearch(cfg, rings, matcher, status))
+            + fetch_jsearch(cfg, rings, matcher, status)
+            + fetch_remote(cfg, rings, matcher, status))
 
     seen_path = gl.state_dir() / "seen_jobs.json"
     seen = gl.load_json(seen_path, {})

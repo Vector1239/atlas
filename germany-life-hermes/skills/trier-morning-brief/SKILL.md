@@ -23,7 +23,7 @@ metadata:
 3. Translate German headlines (`[de]`) into English. Keep names and places as they are.
 4. Choose items in this order: local relevance to Trier or Uni Trier, then rules that affect
    international students (residence permits, Blue Card, work limits, Deutschlandticket,
-   rent, university), then the data / AI job market, then general news. Skip crime reports,
+   rent, university), then the data, AI and software job market, then general news. Skip crime reports,
    accidents and sports unless they are major. Drop duplicates of the same story.
 5. Write the message in this shape, skipping any section with nothing in it:
 
