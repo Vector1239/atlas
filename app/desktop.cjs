@@ -1,8 +1,9 @@
-const { app, BrowserWindow, Menu, dialog, shell, session } = require('electron');
+const { app, BrowserWindow, Menu, dialog, session } = require('electron');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
+const { openInBrowser, closeBrowser } = require('./browser/window.cjs');
 
 app.setName('Atlas');
 app.userAgentFallback += ` Atlas/${app.getVersion()} (+https://github.com/Vector1239/atlas)`;
@@ -16,8 +17,9 @@ const primary = app.requestSingleInstanceLock();
 if (!primary) app.quit();
 app.on('second-instance', () => { if (window) { if (window.isMinimized()) window.restore(); window.show(); window.focus(); } });
 
+// Web links from Atlas open in its own browser window; see browser/window.cjs.
 function external(url) {
-  try { if (['https:', 'http:'].includes(new URL(url).protocol)) shell.openExternal(url); } catch {}
+  try { if (['https:', 'http:'].includes(new URL(url).protocol)) openInBrowser(url, path.join(__dirname, 'assets/Atlas.png')); } catch {}
 }
 function createWindow(url) {
   baseURL = new URL(url).origin;
@@ -33,7 +35,7 @@ function createWindow(url) {
   const launchURL = new URL(url);
   if (process.env.ATLAS_OPEN_UPDATES === '1') launchURL.searchParams.set('settings', 'updates');
   window.loadURL(launchURL.href);
-  window.on('closed', () => { window = null; });
+  window.on('closed', () => { window = null; closeBrowser(); });
 }
 
 app.whenReady().then(() => {
