@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -41,6 +42,18 @@ class ProviderTests(unittest.TestCase):
         providers.save_credentials("openwebninja", "")
         with patch.dict(os.environ, {"JSEARCH_API_KEY": "environment-key"}):
             self.assertFalse(providers.provider_state()["configured"])
+
+    def test_saved_credentials_survive_a_fresh_process_without_returning_the_key(self):
+        providers.save_credentials('openwebninja','private-restart-test-key')
+        script = '''import json, sys
+sys.path.insert(0, sys.argv[1])
+import job_providers
+assert job_providers.credentials() == ('openwebninja', 'private-restart-test-key')
+print(json.dumps(job_providers.provider_state()))
+'''
+        result = subprocess.check_output([sys.executable,'-c',script,str(Path(providers.__file__).parent)],text=True)
+        self.assertTrue(json.loads(result)['configured'])
+        self.assertNotIn('private-restart-test-key',result)
 
     def test_both_provider_response_shapes_and_header_authentication(self):
         for host, response, header in [("openwebninja", {"data": {"jobs": [self.item], "cursor": "ignored"}}, "x-api-key"),
