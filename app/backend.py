@@ -348,7 +348,8 @@ def refresh_data(include_jsearch=False):
         status = []
         jobs = (job_scan.fetch_bundesagentur(cfg, {0, 1, 2}, matcher, status)
                 + job_scan.fetch_arbeitnow(cfg, {0, 1, 2}, matcher, status)
-                + job_scan.fetch_jsearch(cfg, {0, 1, 2, 3}, matcher, status, allow_network=include_jsearch))
+                + job_scan.fetch_jsearch(cfg, {0, 1, 2, 3}, matcher, status, allow_network=include_jsearch)
+                + job_scan.fetch_remote(cfg, {2, 3}, matcher, status))
         # Free-source refreshes preserve JSearch listings already saved locally.
         cutoff = (gl.now(cfg).date() - dt.timedelta(days=cfg.get('jobs', {}).get('max_age_days', 14))).isoformat()
         with LOCK:
@@ -438,7 +439,7 @@ def describe_jobs():
             jobs = [dict(job) for job in CACHE.get("jobs", [])]
         with contextlib.suppress(Exception):
             places = {(row["city"], str(row.get("country") or "DE").upper(), row.get("region_name", ""))
-                      for row in enriched_jobs(jobs) if not row["location"] and row["city"] != "Location not provided"}
+                      for row in enriched_jobs(jobs) if not row["location"] and row["city"] not in ("Location not provided", "Remote")}
             discovery.geocode(sorted(places), STATE_DIR / "places_cache.json", gl.http_json)
         found = job_details.describe(jobs, STATE_DIR, stop=STOP, progress=lambda n: DESCRIBE_STATUS.update(fetched=n))
         with LOCK:

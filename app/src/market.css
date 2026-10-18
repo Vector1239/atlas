@@ -26,7 +26,7 @@
 .market-facts{margin:0;display:grid;gap:0}
 .market-facts div{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid #f1f1ec}
 .market-facts div:first-child{border-top:0;padding-top:0}
-.market-facts dt{font-size:11px;color:var(--ink-2)}
+.market-facts dt{font-size:11px;color:var(--ink-2);display:flex;flex-direction:column;align-items:flex-start;gap:4px}
 .market-facts dd{margin:0;font-size:13px;font-weight:600;color:var(--ink-1);text-align:right;display:flex;flex-direction:column;gap:2px}
 .market-facts dd small{font-size:9px;font-weight:400;color:var(--ink-3)}
 .market-subhead{font-size:11px;font-weight:550;color:var(--ink-2);margin:18px 0 10px}

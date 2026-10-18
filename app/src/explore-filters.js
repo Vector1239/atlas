@@ -33,9 +33,11 @@ export function exploreView(items, { inView = true, bounds = null, selected = nu
   return result;
 }
 export function selectExplore(data, filters) {
-  const jobs = filters.kind === 'events' ? [] : selectJobs(data.jobs, filters, data.saved_jobs).map(job => ({ ...job, kind: 'job', key: `job:${job.id}` }));
+  // Remote roles have no place: distance and city filters don't apply to them.
+  const remote = filters.kind === 'remote', jobFilters = remote ? { ...filters, distance: 'any', city: 'all' } : filters;
+  const jobs = filters.kind === 'events' ? [] : selectJobs(data.jobs, jobFilters, data.saved_jobs).filter(job => !remote || job.remote).map(job => ({ ...job, kind: 'job', key: `job:${job.id}` }));
   const cutoff = new Date(`${data.date}T12:00:00`); cutoff.setDate(cutoff.getDate() + Number(filters.period));
-  const events = filters.kind === 'jobs' ? [] : (data.events?.items || []).filter(event => {
+  const events = ['jobs', 'remote'].includes(filters.kind) ? [] : (data.events?.items || []).filter(event => {
     const distance = cityDistance(event.location);
     return `${event.title} ${event.city} ${event.venue} ${event.category} ${event.source}`.toLowerCase().includes(filters.search.trim().toLowerCase())
       && (filters.period === 'all' || new Date(`${event.start}T12:00:00`) <= cutoff)

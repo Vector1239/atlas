@@ -220,7 +220,7 @@ def analyze(jobs, profile=""):
         "remote": sum(bool(row["job"].get("remote")) for row in rows),
         "visa": sum(bool(row["job"].get("visa")) for row in rows),
         "cities": _top(collections.Counter(row["job"].get("city") for row in rows
-                                           if row["job"].get("city") and row["job"].get("city") != "Location not provided"), 6),
+                                           if row["job"].get("city") not in (None, "", "Location not provided", "Remote")), 6),
         "companies": [row for row in _top(collections.Counter(row["job"].get("company") for row in rows if row["job"].get("company")), 8)
                       if row["count"] > 1],
         "profile_skills": sorted(have),

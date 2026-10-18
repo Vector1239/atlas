@@ -52,7 +52,8 @@ data/*.{toml,csv} ───┘        │ fetch, filter, dedupe, print
 ## Sources
 
 - **Jobs:** Bundesagentur für Arbeit job search (free website interface; can change), Arbeitnow (free; has a
-  visa-sponsorship filter), JSearch (optional key; broader European coverage, with manual requests, daily caching and a monthly request cap; automatic scans use cached results only)
+  visa-sponsorship filter), Remotive and Jobicy (free remote boards; only roles open to Germany, Europe or
+  worldwide; each request cached 12 hours; listings link back to the board), JSearch (optional key; broader European coverage, with manual requests, daily caching and a monthly request cap; automatic scans use cached results only)
 - **News:** Google News searches for Trier, Uni Trier, Luxembourg, RLP/Saarland and rules for
   internationals; Tagesschau, DW, 16vor, Volksfreund, r/Trier, Politico Europe
 - **Daily life:** Open-Meteo (weather), OpenMensa (Studierendenwerk Trier menus)

@@ -84,7 +84,8 @@ class AtlasTests(unittest.TestCase):
         with patch.dict(b.CACHE,{'jobs':[cached],'news':[]}), patch.object(b,'config',return_value=cfg), \
                 patch.object(b.morning_brief,'weather',return_value=[]), patch.object(b.morning_brief,'mensa',return_value=[]), \
                 patch.object(b.NEWS_MEDIA,'start'), patch.object(b.job_scan,'fetch_bundesagentur',return_value=[free]), \
-                patch.object(b.job_scan,'fetch_arbeitnow',return_value=[]), patch.object(b.job_scan,'fetch_jsearch',return_value=[]) as paid:
+                patch.object(b.job_scan,'fetch_arbeitnow',return_value=[]), patch.object(b.job_scan,'fetch_jsearch',return_value=[]) as paid, \
+                patch.object(b.job_scan,'fetch_remote',return_value=[]):
             b.refresh_data()
             self.assertEqual(b.REFRESH_STATUS['error'],'')
             self.assertEqual({job['source'] for job in b.CACHE['jobs']},{'JSearch','Bundesagentur'})

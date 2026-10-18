@@ -166,6 +166,15 @@ enabled = true
 pages = 3          # general listings, ~100 per page
 visa_pages = 2     # extra pages from the visa-sponsorship feed
 
+# Remote boards (free, no key): Remotive and Jobicy. Listings link back to the board, as their
+# terms require. Only roles open to people in Germany, Europe or worldwide are kept. Each request
+# is cached 12 hours (Remotive asks for at most 4 requests a day, Jobicy for one sync an hour).
+[jobs.remote]
+enabled = true
+remotive_categories = ["data", "software-dev"]
+jobicy_industries = ["data-science"]
+jobicy_geos = ["europe", "anywhere"]
+
 # Optional JSearch, as used by Dossier. OpenWeb Ninja has a free, hard-limited plan.
 # Add a key in Atlas Settings → Sources; no key is needed for the sources above.
 # Requests are manual: use Search JSearch now in Settings → Sources.
