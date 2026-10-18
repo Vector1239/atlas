@@ -168,9 +168,11 @@ visa_pages = 2     # extra pages from the visa-sponsorship feed
 
 # Optional JSearch, as used by Dossier. OpenWeb Ninja has a free, hard-limited plan.
 # Add a key in Atlas Settings → Sources; no key is needed for the sources above.
+# Requests are manual: use Search JSearch now in Settings → Sources.
+# Keep enabled=false so older app/cron versions cannot spend credits automatically.
 # One page per search, cached 24 hours; Atlas caps requests at 180 per UTC month.
 [jobs.jsearch]
-enabled = true
+enabled = false
 
 [[jobs.jsearch.searches]]
 ring = 0

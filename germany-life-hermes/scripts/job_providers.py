@@ -91,12 +91,7 @@ def normalize_jsearch(item, ring):
             "remote": item.get("job_is_remote") is True, "visa": False}
 
 
-def search_jsearch(search, key, host, max_age):
-    """One page per query/day; share cache and a hard request budget with cron.
-
-    Reserve a request before sending it, including failures. No retries, automatic
-    pagination or paid-plan upgrades; provider authentication/quota errors back off.
-    """
+def search_url(search, host, max_age):
     place = search.get("where", "")
     params = {"query": search["what"] + (f" in {place}" if place else ""),
               "country": search.get("country", "de"), "date_posted": "month" if max_age > 7 else "week"}
@@ -106,7 +101,25 @@ def search_jsearch(search, key, host, max_age):
         params["language"] = search["language"]
     if host == "rapidapi":
         params.update(page=1, num_pages=1)
-    url = HOSTS[host] + "?" + urllib.parse.urlencode(params)
+    return HOSTS[host] + "?" + urllib.parse.urlencode(params)
+
+
+def cached_jsearch(search, host, max_age):
+    """Read saved results without reserving a request or contacting the provider."""
+    cache_key = hashlib.sha256(search_url(search, host, max_age).encode()).hexdigest()
+    state = gl.load_json(gl.state_dir() / "jsearch_cache.json", {})
+    entry = state.get("queries", {}).get(cache_key, {})
+    rows = entry.get("jobs", [])
+    return (rows, True) if isinstance(rows, list) and time.time() - entry.get("at", 0) < 30 * CACHE_SECONDS else ([], False)
+
+
+def search_jsearch(search, key, host, max_age):
+    """One page per query/day; share cache and a hard request budget with cron.
+
+    Reserve a request before sending it, including failures. No retries, automatic
+    pagination or paid-plan upgrades; provider authentication/quota errors back off.
+    """
+    url = search_url(search, host, max_age)
     cache_key = hashlib.sha256(url.encode()).hexdigest()
     fingerprint = hashlib.sha256((host + key).encode()).hexdigest()
     path = gl.state_dir() / "jsearch_cache.json"
@@ -147,10 +160,15 @@ def search_jsearch(search, key, host, max_age):
         return raw, False
 
 
-def fetch_jsearch(cfg, rings, matcher, status):
+def fetch_jsearch(cfg, rings, matcher, status, *, allow_network=False):
+    """Automatic callers read cache only, even when it expires or config enables JSearch.
+
+    allow_network is reserved for the app's explicit manual search action. The
+    legacy enabled flag stays false to protect older app and cron installations.
+    """
     options = cfg.get("jobs", {}).get("jsearch", {})
     searches = [s for s in options.get("searches", []) if int(s.get("ring", 2)) in rings]
-    if not options.get("enabled", True) or not searches:
+    if not searches:
         return []
     host, key = credentials()
     if not key:
@@ -164,7 +182,8 @@ def fetch_jsearch(cfg, rings, matcher, status):
     cutoff = (dt.datetime.now(dt.timezone.utc).date() - dt.timedelta(days=max_age)).isoformat()
     for search in searches:
         try:
-            rows, hit = search_jsearch(search, key, host, max_age)
+            rows, hit = (search_jsearch(search, key, host, max_age) if allow_network else
+                         cached_jsearch(search, host, max_age))
             cached += hit
         except Exception as exc:
             errors.append(gl.short_error(exc))
@@ -179,6 +198,7 @@ def fetch_jsearch(cfg, rings, matcher, status):
             found.append(job)
     mark = "✗" if len(errors) == len(searches) else "✓"
     status.append(f"{mark} JSearch: {len(found)} matching postings; {cached} cached searches"
+                  + ("; manual requests only, no credits used" if not allow_network else "")
                   + (f"; {len(errors)} unavailable ({errors[0]})" if errors else ""))
     return found
 

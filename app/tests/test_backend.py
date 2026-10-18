@@ -73,6 +73,37 @@ class AtlasTests(unittest.TestCase):
         self.post('/api/jobs/provider', {'host': 'openwebninja', 'key': ''}).close()
         self.assertFalse(self.backend.public_state()['job_provider']['configured'])
 
+    def test_standard_refresh_preserves_saved_jsearch_jobs_and_disallows_paid_requests(self):
+        b=self.backend
+        today=b.dt.date.today().isoformat()
+        cached={'id':b.gl.short_id('JSearch:cached'),'source':'JSearch','source_id':'cached','title':'Data Scientist',
+                'company':'Saved company','ring':2,'where':'Berlin','posted':today,'url':'https://jobs.example/cached','text':'','flags':[]}
+        free={**cached,'source':'Bundesagentur','source_id':'free','title':'Data Analyst','company':'Free company','url':'https://jobs.example/free'}
+        cfg={'jobs':{'include':['data']}}
+        with patch.dict(b.CACHE,{'jobs':[cached],'news':[]}), patch.object(b,'config',return_value=cfg), \
+                patch.object(b.morning_brief,'weather',return_value=[]), patch.object(b.morning_brief,'mensa',return_value=[]), \
+                patch.object(b.NEWS_MEDIA,'start'), patch.object(b.job_scan,'fetch_bundesagentur',return_value=[free]), \
+                patch.object(b.job_scan,'fetch_arbeitnow',return_value=[]), patch.object(b.job_scan,'fetch_jsearch',return_value=[]) as paid:
+            b.refresh_data()
+            self.assertEqual(b.REFRESH_STATUS['error'],'')
+            self.assertEqual({job['source'] for job in b.CACHE['jobs']},{'JSearch','Bundesagentur'})
+            self.assertFalse(paid.call_args.kwargs['allow_network'])
+
+    def test_only_explicit_jsearch_action_authorizes_paid_refresh(self):
+        b=self.backend
+        cfg={'jobs':{'jsearch':{'searches':[{'what':'data'}]}}}
+        with patch.object(b.threading,'Thread') as worker, patch.object(b.job_providers,'provider_state',return_value={'configured':True}), \
+                patch.object(b,'config',return_value=cfg):
+            b.api_post('/api/refresh',{})
+            self.assertNotIn('kwargs',worker.call_args.kwargs)
+            worker.reset_mock()
+            b.api_post('/api/jobs/jsearch',{})
+            self.assertEqual(worker.call_args.kwargs['kwargs'],{'include_jsearch':True})
+        with patch.object(b.threading,'Thread') as worker, patch.object(b.job_providers,'provider_state',return_value={'configured':False}):
+            with self.assertRaisesRegex(ValueError,'Save a JSearch key'):
+                b.api_post('/api/jobs/jsearch',{})
+            worker.assert_not_called()
+
     def test_job_details_only_fetch_known_listings_and_update_requirement_flags(self):
         job = {'id': 'J-detail', 'source': 'Bundesagentur', 'source_id': '10000-test-S',
                'title': 'Working Student Data Science', 'company': 'Example', 'ring': 0,

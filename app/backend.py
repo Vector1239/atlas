@@ -283,7 +283,7 @@ def collect_news(feed):
     return result
 
 
-def refresh_data():
+def refresh_data(include_jsearch=False):
     if not REFRESH_LOCK.acquire(blocking=False):
         return
     REFRESH_STATUS.update(running=True, error="", message="Checking your sources…")
@@ -331,7 +331,12 @@ def refresh_data():
         status = []
         jobs = (job_scan.fetch_bundesagentur(cfg, {0, 1}, matcher, status)
                 + job_scan.fetch_arbeitnow(cfg, {0, 1, 2}, matcher, status)
-                + job_scan.fetch_jsearch(cfg, {0, 1, 2, 3}, matcher, status))
+                + job_scan.fetch_jsearch(cfg, {0, 1, 2, 3}, matcher, status, allow_network=include_jsearch))
+        # Free-source refreshes preserve JSearch listings already saved locally.
+        cutoff = (gl.now(cfg).date() - dt.timedelta(days=cfg.get('jobs', {}).get('max_age_days', 14))).isoformat()
+        with LOCK:
+            jobs += [dict(job) for job in CACHE.get('jobs', []) if job.get('source') == 'JSearch'
+                     and (not job.get('posted') or job['posted'][:10] >= cutoff)]
         found, seen = [], set()
         for job in sorted(jobs, key=lambda item: item["ring"]):
             key = f"{gl.norm(job['title'])}|{gl.norm(job['company'])}"
@@ -421,6 +426,7 @@ def public_state():
     labels += sorted({job["source_label"] for job in result["jobs"]} - set(labels))
     result["job_sources"] = [{"name": name, "count": sum(j["source_label"] == name for j in result["jobs"])} for name in labels]
     result["job_provider"] = job_providers.provider_state()
+    result["job_provider"]["search_count"] = len(config().get("jobs", {}).get("jsearch", {}).get("searches", []))
     result["deadlines"], result["deadlines_error"] = deadline_rows(today)
     result["work"] = work_summary(today.year)
     result["worklog"] = list(reversed(read_csv("worklog.csv")))
@@ -735,6 +741,15 @@ def api_post(path, body):
         return {"ok": True}
     if path == "/api/refresh":
         threading.Thread(target=refresh_data, daemon=True).start()
+        return {"ok": True}
+    if path == "/api/jobs/jsearch":
+        if REFRESH_LOCK.locked():
+            raise ValueError("A source refresh is already running. Try again after it finishes.")
+        if not job_providers.provider_state()["configured"]:
+            raise ValueError("Save a JSearch key in Settings → Sources first.")
+        if not config().get("jobs", {}).get("jsearch", {}).get("searches"):
+            raise ValueError("No JSearch searches are configured.")
+        threading.Thread(target=refresh_data, kwargs={"include_jsearch": True}, daemon=True).start()
         return {"ok": True}
     if path == "/api/profile":
         text = validate_text(body.get("text"), "profile", 20000)

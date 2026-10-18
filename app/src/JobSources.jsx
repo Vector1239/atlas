@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 
-export default function JobSources({ provider, act }) {
+export default function JobSources({ provider, refresh, act }) {
   const [host, setHost] = useState(provider?.host || 'openwebninja');
   const [key, setKey] = useState(''), [saving, setSaving] = useState(false);
   async function save(remove = false) {
     setSaving(true);
     try {
-      const result = await act('/api/jobs/provider', { host, key: remove ? '' : key.trim() }, remove ? 'JSearch disconnected.' : 'JSearch key saved. Refresh sources to find jobs.');
+      const result = await act('/api/jobs/provider', { host, key: remove ? '' : key.trim() }, remove ? 'JSearch disconnected.' : 'JSearch key saved. Use Search JSearch now when you want new results.');
       if (result) setKey('');
     } finally { setSaving(false); }
   }
@@ -20,5 +20,6 @@ export default function JobSources({ provider, act }) {
       <p className="form-help">{provider?.requests || 0} / {provider?.monthly_limit || 180} Atlas requests this month. Search terms and locations are sent to your chosen provider. Your profile and chats stay local. RapidAPI plan limits may differ.</p>
       <div className="button-row"><button className="button secondary" type="submit" disabled={saving || !key.trim()}>{saving ? 'Saving…' : 'Save key'}</button>{provider?.configured && <button type="button" className="text-button" disabled={saving} onClick={() => save(true)}>Disconnect JSearch</button>}</div>
     </form>
+    <div className="job-manual-search"><p className="form-help"><strong>Manual searches only.</strong> Opening Atlas, restarting after updates, refreshing sources and scheduled scans use saved JSearch results without spending credits.</p><p className="form-help">A manual search may use up to {provider?.search_count || 0} requests. Searches cached within the last 24 hours are reused.</p><button className="button secondary" disabled={!provider?.configured || !provider?.search_count || refresh?.running || saving} onClick={() => act('/api/jobs/jsearch', {}, 'JSearch requested. Existing results stay visible while sources refresh.')}>{refresh?.running ? 'Sources are refreshing…' : 'Search JSearch now'}</button></div>
   </section>;
 }

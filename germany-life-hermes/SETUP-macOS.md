@@ -102,7 +102,7 @@ there couldn't be tested when this was written.
 [OpenWeb Ninja](https://www.openwebninja.com/api/jsearch) and select the Free plan
 (currently 200 requests/month, a hard limit, no credit card required). In Atlas,
 open **Settings → Sources**, select OpenWeb Ninja, paste the key and save it.
-Then refresh sources. RapidAPI keys are also supported; choose RapidAPI for those.
+Then choose **Search JSearch now** when you want new results. RapidAPI keys are also supported; choose RapidAPI for those.
 
 Atlas stores the key in the ignored `state/job_credentials.json` file with owner-only
 permissions. The app and installed Hermes scripts share it through the project
@@ -111,7 +111,7 @@ folder. For a headless installation, set `JSEARCH_API_KEY` and optionally
 `terminal.env_passthrough`. A saved Atlas key takes precedence over environment
 variables; Disconnect saves an empty key to disable JSearch.
 
-Each configured query fetches one page and is cached for 24 hours. Atlas caps its
+JSearch requests are manual only. App startup, update restarts, ordinary refreshes, source checks and cron scans read saved results without making provider requests. Use **Settings → Sources → Search JSearch now** to authorize a search. The legacy `jobs.jsearch.enabled=false` setting also stops older app/cron versions from making automatic requests; leave it false. The manual action in current Atlas works with this safeguard in place. Each configured query fetches one page and is cached for 24 hours. Atlas caps its
 JSearch requests (including failures) at 180 per UTC calendar month across the app
 and cron scripts. Existing cached searches remain usable at the cap. The six default
 queries cover Trier, Luxembourg, Germany, the Netherlands, Austria and Belgium;

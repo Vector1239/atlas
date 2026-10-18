@@ -118,10 +118,45 @@ print(json.dumps(job_providers.provider_state()))
         cfg = {"jobs": {"include": ["data"], "jsearch": {"searches": [{**self.search, "ring": 1}, {**self.search, "ring": 3}]}}}
         with patch.object(gl, "http_json", return_value={"data": {"jobs": [self.item, self.item, old, irrelevant]}}):
             status = []
-            jobs = providers.fetch_jsearch(cfg, {1}, job_scan.Matcher(cfg["jobs"]), status)
+            jobs = providers.fetch_jsearch(cfg, {1}, job_scan.Matcher(cfg["jobs"]), status, allow_network=True)
         self.assertEqual(len(jobs), 1)
         self.assertEqual(jobs[0]["ring"], 1)
         self.assertTrue(status[0].startswith("✓"))
+
+    def test_automatic_scan_without_cache_never_contacts_provider_or_reserves_credits(self):
+        providers.save_credentials('openwebninja','secret')
+        cfg={'jobs':{'include':['data'],'jsearch':{'enabled':True,'searches':[self.search]}}}
+        with patch.object(gl,'http_json') as request:
+            status=[]
+            jobs=providers.fetch_jsearch(cfg,{2},job_scan.Matcher(cfg['jobs']),status)
+        request.assert_not_called()
+        self.assertEqual(jobs,[])
+        self.assertEqual(providers.provider_state()['requests'],0)
+        self.assertIn('no credits used',status[0])
+        self.assertFalse((gl.state_dir()/'jsearch_cache.json').exists())
+
+    def test_automatic_scan_uses_old_cache_without_changing_request_budget(self):
+        providers.save_credentials('openwebninja','secret')
+        with patch.object(gl,'http_json',return_value={'data':{'jobs':[self.item]}}):
+            providers.search_jsearch(self.search,'secret','openwebninja',14)
+        cache=gl.state_dir()/'jsearch_cache.json'
+        before=cache.read_bytes()
+        cfg={'jobs':{'include':['data'],'jsearch':{'enabled':False,'searches':[self.search]}}}
+        with patch.object(providers.time,'time',return_value=providers.time.time()+2*86400), patch.object(gl,'http_json') as request:
+            jobs=providers.fetch_jsearch(cfg,{2},job_scan.Matcher(cfg['jobs']),[])
+        request.assert_not_called()
+        self.assertEqual(len(jobs),1)
+        self.assertEqual(cache.read_bytes(),before)
+        self.assertEqual(providers.provider_state()['requests'],1)
+
+    def test_explicit_manual_search_can_fetch_with_legacy_automatic_switch_disabled(self):
+        providers.save_credentials('openwebninja','secret')
+        cfg={'jobs':{'include':['data'],'jsearch':{'enabled':False,'searches':[self.search]}}}
+        with patch.object(gl,'http_json',return_value={'data':{'jobs':[self.item]}}) as request:
+            jobs=providers.fetch_jsearch(cfg,{2},job_scan.Matcher(cfg['jobs']),[],allow_network=True)
+        self.assertEqual(len(jobs),1)
+        self.assertEqual(request.call_count,1)
+        self.assertEqual(providers.provider_state()['requests'],1)
 
     def test_bundesagentur_details_uses_base64_reference_and_public_client_header(self):
         with patch.object(gl, "http_json", return_value={"stellenangebotsBeschreibung": "<p>Full requirements</p>"}) as request:
