@@ -12,7 +12,7 @@ Atlas brings your existing Germany-life project and Hermes Agent into one local 
 - **Ask Atlas:** Hermes with local Gemma, enabled web search/extraction, and recent conversation context. Searches contact external search providers/sites; model inference stays local. Full chat history is saved in Atlas; only a bounded recent selection is sent each turn so the 16K model never has to resume the older 64K-compression-dependent session.
 - **Settings:** edit your profile, change reasoning effort, start or stop Gemma, manage routines, check sources, and install app updates.
 
-The version (currently 1.10.0) is shown at the bottom of the sidebar and under **Atlas → About Atlas**. It is set in `app/package.json`; bump it there when you change the app.
+The version (currently 1.10.1) is shown at the bottom of the sidebar and under **Atlas → About Atlas**. It is set in `app/package.json`; bump it there when you change the app.
 
 ## Updating Atlas
 
