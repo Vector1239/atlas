@@ -10,10 +10,10 @@ Atlas brings your existing Germany-life project and Hermes Agent into one local 
 - **News:** a continuous image-and-text grid showing every gathered story by default, with real article photos where available. A compact toolbar opens a slide-over for region/source/time/search filters, images-only filtering and English/original headline controls. Publisher labels, publication dates, original titles and source links stay on each story. Today keeps a compact three-story preview linking to News. Existing translations are included locally; new headlines translate automatically in small batches while Gemma is already running and chat is idle. Gathered stories stay available for 14 days after their publication, even if the publisher rotates its feed.
 - **Life admin:** add deadlines and work shifts; see the project's work-day budget.
 - **Tech:** six live event sources: developers.events, the CCC calendar, Maschinendeck Trier’s public calendar API, Silicon Luxembourg’s calendar, Major League Hacking and Devpost. Reading comes from GitHub, Cloudflare, Google Developers, Mozilla Hacks and Rust. Source, topic/search, event type, date, country/city and radius filters combine. Event cards show source-provided times, entry prices, prize pools and topics where available; **Details & sources** exposes venues, organisers, provenance and checks. Devpost dates are explicitly labelled submission windows rather than in-person event dates. MLH’s current season is selected from the date; Maschinendeck recurring meetings use the calendar’s expanded occurrences for the next 90 days. Calendar all-day end dates follow RFC 5545, and timezone changes are preserved. Duplicate listings combine provenance; failed sources keep their own previous cache without blocking healthy feeds. Feeds refresh on launch, on request and every six hours. Devpost refreshes read at most five pages of the public open/upcoming feed, so coverage is not exhaustive. Curated fallback entries remain labelled with their original check date. Conference data is attributed to [developers.events contributors](https://github.com/scraly/developers-conferences-agenda) under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/); Atlas filters and reformats the listings.
-- **Ask Atlas:** Hermes with local Gemma, enabled web search/extraction, and recent conversation context. Searches contact external search providers/sites; model inference stays local. Full chat history is saved in Atlas; only a bounded recent selection is sent each turn.
-- **Settings:** edit your profile, change reasoning effort, start or stop Gemma, manage routines, check sources, and install app updates.
+- **Ask Atlas:** one continuing Hermes conversation with local Gemma, web search/extraction, memory and the Germany-life skills. Hermes keeps the conversation itself; **New conversation** starts a fresh one. Searches contact external search providers/sites; model inference stays local. Commands that need approval are declined automatically.
+- **Settings:** edit your profile, change reasoning effort, start or stop Hermes and Gemma, manage routines, check sources, and install app updates.
 
-The version (currently 1.12.0) is shown at the bottom of the sidebar and under **Atlas → About Atlas**. It is set in `app/package.json`; bump it there when you change the app.
+The version (currently 1.12.1) is shown at the bottom of the sidebar and under **Atlas → About Atlas**. It is set in `app/package.json`; bump it there when you change the app.
 
 ## Updating Atlas
 
@@ -27,18 +27,18 @@ If an older installed updater refuses to update because of local edits, quit Atl
 
 ## First use
 
-1. Open Atlas. Browse the Explore map with Gemma paused. Start it in **Settings → Local model** when you want AI features; the lower-left status changes to **Gemma is ready**.
+1. Open Atlas. In **Settings → Local model**, select **Connect to Hermes** once, then **Start Hermes**. Sending a message also starts it. The lower-left status shows **Gemma is ready** while the model is loaded.
 2. In **Settings → Your profile**, replace the template placeholders and save.
 3. Add your real deadlines in **Life admin**. The example dates are ignored.
-4. Enable routines in **Settings → Routines**. They save results locally and run while Atlas is open and Gemma is ready.
+4. Enable routines in **Settings → Routines**. Hermes runs them on schedule while it is on, even when Atlas is closed.
 
 Telegram is optional. No cloud model key is required for the installed configuration.
 
 ## Local model
 
-Gemma 4 12B Instruct Q4_K_M (7.12 GB), served by llama.cpp using Apple Metal with a 65,536-token context (Hermes requires at least 64K for tool use). Thinking is off by default for new configurations. The pinned source, exact file size and published SHA-256 are in `app/content/local-model.json`. Install or verify the model with `python3 app/install_model.py`; the installer verifies its SHA-256 before creating the ready marker. Model files stay outside Git in `~/.cache/Atlas/models/`.
+Gemma 4 12B Instruct Q4_K_M (7.12 GB), managed by Hermes. Hermes' model server (llama.cpp with Apple Metal) loads it on demand with at least a 64K context and serves Ask Atlas, briefs, translations and routines. The pinned source, exact file size and published SHA-256 are in `app/content/local-model.json`. Install or verify it with `python3 app/install_model.py`, which puts it in `~/.hermes/models/` (and moves a copy from older Atlas versions instead of downloading again) and verifies the SHA-256 before creating the ready marker. Hermes needs its llama.cpp engine once: run `hermes model` → **Local models**, which also lets you pick Gemma as Hermes' default model for routines.
 
-The model lives in `~/.cache/Atlas/models/`. **Stop Gemma** appears at the top of every page while Gemma is active, including during a brief or reply. It cancels the active request, stops the model, frees memory, and remembers the pause across app restarts. The same action is in **Settings → Local model → Stop Gemma & free memory**. Starting Gemma enables automatic startup on subsequent launches until you stop it again. Quitting Atlas stops the model and app service it launched.
+Atlas unloads Gemma after 5 minutes without use, unless a routine is running; the next request loads it again, which takes a few seconds. **Stop Gemma** (at the top of every page while it is active, and in **Settings → Local model**) cancels the current request and unloads it straight away. **Stop Hermes** frees everything Hermes uses; routines and chat pause until you start it again. Quitting Atlas leaves Hermes running so routines keep working.
 
 The current English job titles and headline translations are included locally. Unseen German titles remain clearly labelled in their original language until you select **Translate new titles** with Gemma running. New headlines translate automatically while Gemma is already running and chat is idle; News shows the queue and offers **Translate now**. Translation batches yield to foreground chat. Both translation actions require Gemma to already be running and never start it automatically. Translations are cached by their original text on your Mac. Translated titles do not establish English-only eligibility; check the original listing for requirements. Distances are supplied by job boards and are not driving distances; unknown distances are excluded when you set a radius.
 
@@ -64,7 +64,7 @@ The app uses `germany-life-hermes` for your profile, deadlines, work log, and fe
 
 ## Development
 
-From a fresh clone, install the project scripts and skills using the [macOS setup guide](germany-life-hermes/SETUP-macOS.md). Hermes, Python 3.12, llama.cpp and Docker Desktop are separate prerequisites; the Gemma weights are downloaded separately and are not stored in Git.
+From a fresh clone, install the project scripts and skills using the [macOS setup guide](germany-life-hermes/SETUP-macOS.md). Hermes (with its gateway installed as a service: `hermes gateway install`), Python 3.12 and Docker Desktop are separate prerequisites; the Gemma weights are downloaded separately and are not stored in Git.
 
 From the repository root:
 
