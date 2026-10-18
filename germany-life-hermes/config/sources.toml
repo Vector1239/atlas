@@ -112,17 +112,27 @@ max_items_per_run = 30       # cap what the agent sees per run
 exclude_temp_agencies = true # Bundesagentur: drop Zeitarbeit postings
 
 # A job is kept only if its title (or category/tags) matches one of these
-# (case-insensitive regular expressions).
+# (case-insensitive regular expressions). Data/AI roles and software roles of every kind.
 include = [
+  # data & AI
   '\bdata\b', 'daten(?!schutz)', 'machine learning', '\bml\b', '\bai\b', '\bki\b',
   'künstliche intelligenz', 'analy', 'statisti', 'python', 'business intelligence',
   '\bbi\b', '\bnlp\b', 'deep learning', '\bllm', 'computer vision', 'forecast',
-  'data scien', 'data engineer', 'hilfskraft', '\bhiwi\b', 'research assistant',
+  'data scien', 'data engineer', 'prompt engineer', 'mlops',
+  # software engineering: full stack, web, backend, mobile, cloud
+  'software', 'developer', 'entwickler', 'programmier', 'informatik', 'full.?stack',
+  'front.?end', 'back.?end', 'web.?(?:develop|entwickl|engineer)', 'mobile.?(?:app|dev|engineer|entwickl|software)', 'app.?develop', '\bios\b',
+  'android', 'flutter', 'react', 'angular', '\bvue', 'node\.?js', 'typescript', 'javascript',
+  '\bjava\b', 'kotlin', '\bswift\b', 'golang', '\.net\b', 'c\+\+', 'devops', '\bcloud\b',
+  'platform engineer', 'site reliability', '\bsre\b', 'app.?entwickl', 'test automat', '\bqa engineer',
+  # university
+  'hilfskraft', '\bhiwi\b', 'research assistant',
 ]
-# ...and dropped if its title matches one of these.
+# ...and dropped if its title matches one of these (also: no cybersecurity roles).
 exclude = [
   'ausbildung', 'pflege', 'fahrer', 'lager', 'verkäuf', 'kassier', 'reinigung',
-  'datenschutz', 'erfassung',
+  'datenschutz', 'erfassung', 'business develop', 'personalentwickl', 'produktentwickl',
+  'security', 'sicherheit', 'cyber', 'pentest', 'penetration', '\bsoc\b', '\bsiem\b', 'forensi',
 ]
 student = ['werkstudent', 'working student', 'studentische', 'hilfskraft', '\bhiwi\b',
            'praktik', '\bintern', 'thesis', 'abschlussarbeit', 'masterarbeit']
@@ -144,20 +154,24 @@ where = "Trier"
 radius_km = 50
 queries = ["Data Science", "Data Analyst", "Machine Learning", "Werkstudent Data",
            "Werkstudent Informatik", "Python", "Business Intelligence", "Statistik",
-           "Wissenschaftliche Hilfskraft"]
+           "Wissenschaftliche Hilfskraft", "Softwareentwickler", "Werkstudent Softwareentwicklung",
+           "Full Stack", "App Entwickler", "Künstliche Intelligenz"]
 
 [[jobs.bundesagentur]]
 ring = 1
 where = "Trier"
 radius_km = 150
 queries = ["Data Scientist", "Data Analyst", "Machine Learning", "Werkstudent Data Science",
-           "Data Engineer"]
+           "Data Engineer", "Software Engineer", "Werkstudent Software", "Full Stack Developer",
+           "AI Engineer", "Mobile Developer"]
 
 [[jobs.bundesagentur]]
 ring = 2
 where = ""   # all of Germany
 queries = ["Junior Data Scientist", "Werkstudent Data Science", "Junior Data Analyst",
-           "Junior Machine Learning Engineer", "Graduate Data Scientist"]
+           "Junior Machine Learning Engineer", "Graduate Data Scientist", "Junior Software Engineer",
+           "Werkstudent Softwareentwicklung", "Junior Full Stack Developer", "Junior Frontend Developer",
+           "Junior Backend Developer", "Junior Mobile Developer", "AI Engineer"]
 
 # Arbeitnow (Germany-focused board with a visa-sponsorship filter; free, no key).
 # Rings come from ring0_places / ring1_places; everything else is ring 2.
@@ -173,9 +187,10 @@ visa_pages = 2     # extra pages from the visa-sponsorship feed
 [jobs.remote]
 enabled = true
 remotive_categories = ["data", "software-dev"]
-jobicy_industries = ["data-science"]
+jobicy_industries = ["data-science", "engineering"]
 jobicy_geos = ["europe", "anywhere"]
-himalayas_queries = ["data scientist", "data analyst", "data engineer", "machine learning"]
+himalayas_queries = ["data scientist", "data analyst", "data engineer", "machine learning", "ai engineer",
+                     "software engineer", "full stack", "frontend", "backend", "mobile developer"]
 himalayas_country = "DE"   # Himalayas returns roles open to this country plus worldwide ones
 
 # Optional JSearch, as used by Dossier. OpenWeb Ninja has a free, hard-limited plan.

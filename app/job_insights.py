@@ -15,7 +15,10 @@ FAMILIES = [
     ("Data science", r"data scien|datenwissenschaft|scientist"),
     ("ML & AI", r"machine learning|maschinelles lernen|\bml\b|\bai\b|\bki\b|künstliche intelligenz|artificial intelligence|deep learning|computer vision|\bnlp\b|\bllm|mlops"),
     ("Analytics & BI", r"analy|business intelligence|\bbi\b|reporting|controlling|statisti|insight"),
-    ("Software & IT", r"software|develop|entwickl|engineer|informati|programm|devops|cloud|\bit\b|\bit-|system|admin"),
+    ("Mobile", r"mobile|\bios\b|android|flutter|react native|kotlin|swift|app.?entwickl|app.?develop"),
+    ("Full stack & frontend", r"full.?stack|front.?end|web.?(?:develop|entwickl|engineer)|react|angular|\bvue|javascript|typescript"),
+    ("Backend, cloud & DevOps", r"back.?end|\bjava\b|golang|\.net\b|c#|node\.?js|cloud|devops|platform|site reliability|\bsre\b|kubernetes"),
+    ("Software engineering", r"software|develop|entwickl|engineer|informati|programm|\bit\b|\bit-|system|admin|\bqa\b|test automat"),
     ("Consulting & product", r"consult|berater|beratung|product|produkt|project|projekt|manage"),
 ]
 FAMILY_RULES = [(name, re.compile(pattern, re.I)) for name, pattern in FAMILIES]
@@ -32,12 +35,19 @@ SKILLS = {
     "Azure": r"\bazure\b", "Google Cloud": r"\bgcp\b|google cloud|bigquery", "Docker & Kubernetes": r"\bdocker\b|kubernetes|\bk8s\b",
     "MLOps": r"mlops|mlflow|model deployment", "Git": r"\bgit\b|github|gitlab", "Linux": r"\blinux\b",
     "Power BI": r"power ?bi", "Tableau": r"tableau", "Excel": r"\bexcel\b", "SAP": r"\bsap\b",
-    "Java": r"\bjava\b(?!\s*script)", "Scala": r"\bscala\b", "C++": r"c\+\+", "JavaScript / TypeScript": r"javascript|typescript|node\.?js",
-    "MATLAB": r"matlab",
+    "Java": r"\bjava\b(?!\s*script)", "Scala": r"\bscala\b", "C++": r"c\+\+", "C# / .NET": r"c#|\.net\b",
+    "JavaScript": r"javascript|\bes6\b", "TypeScript": r"typescript", "Node.js": r"node\.?js", "React": r"\breact(?!\s*native)\b",
+    "React Native": r"react\s*native", "Angular": r"\bangular\b", "Vue": r"\bvue(?:\.?js)?\b", "Kotlin": r"\bkotlin\b",
+    "Flutter": r"\bflutter\b|\bdart\b", "Rust": r"\brust\b", "PHP": r"\bphp\b", "Spring": r"spring ?boot|spring framework",
+    "Django / FastAPI / Flask": r"django|fastapi|\bflask\b", "REST APIs": r"\brest(?:ful)?[- ]?apis?\b|\brestful\b",
+    "GraphQL": r"graphql", "Microservices": r"micro-?services?", "CI/CD": r"ci ?/ ?cd|continuous integration|github actions|gitlab ci|jenkins",
+    "Terraform": r"terraform", "MATLAB": r"matlab",
 }
 SKILL_RULES = {name: re.compile(pattern, re.I) for name, pattern in SKILLS.items() if pattern}
-# "R" is a single capital letter: case-sensitive, and not R&D, R+V or a word fragment.
+# "R", "Go" and "Swift" are ordinary words too: case-sensitive, and Go only as a listed language.
 SKILL_RULES["R"] = re.compile(r"(?<![\w&.+'’-])R(?![\w&+#'’-])")
+SKILL_RULES["Go"] = re.compile(r"\bgolang\b|(?<![\w-])Go(?=\s*(?:[,/)]|und\b|and\b|oder\b|or\b|developer|engineer|entwickl))")
+SKILL_RULES["Swift"] = re.compile(r"\bSwift(?:UI)?\b")
 
 LEVEL_ENTRY = re.compile(r"junior|graduate|absolvent|einsteiger|trainee|entry|young professional", re.I)
 NUMBER_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "ten": 10,

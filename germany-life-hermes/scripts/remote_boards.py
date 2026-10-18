@@ -21,8 +21,9 @@ ELIGIBLE = re.compile(r"worldwide|anywhere|global|europe|\beu\b|emea|germany|deu
 GERMANY = re.compile(r"germany|deutschland|\bdach\b", re.I)
 PERIODS = {"hour": "HOUR", "hourly": "HOUR", "month": "MONTH", "monthly": "MONTH", "year": "YEAR", "yearly": "YEAR", "annual": "YEAR"}
 DEFAULTS = {"enabled": True, "remotive_categories": ["data", "software-dev"],
-            "jobicy_industries": ["data-science"], "jobicy_geos": ["europe", "anywhere"],
-            "himalayas_queries": ["data scientist", "data analyst", "data engineer", "machine learning"],
+            "jobicy_industries": ["data-science", "engineering"], "jobicy_geos": ["europe", "anywhere"],
+            "himalayas_queries": ["data scientist", "data analyst", "data engineer", "machine learning", "ai engineer",
+                                  "software engineer", "full stack", "frontend", "backend", "mobile developer"],
             "himalayas_country": "DE"}
 
 

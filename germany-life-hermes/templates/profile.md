@@ -12,9 +12,11 @@
 - Languages: English <level>, German <A1 / A2 / B1 / B2 / C1>, other: <...>
 
 ## Jobs I want
-- Now (while studying): Werkstudent, HiWi or internship in data science, analytics or ML.
+- Now (while studying): Werkstudent, HiWi or internship in data science, analytics, ML/AI or software
+  engineering (full stack, backend, mobile). Not cybersecurity.
   Max 20 h/week during lectures; full-time is fine in semester breaks.
-- After graduation: junior Data Scientist / ML Engineer / Data Analyst, ideally with an EU Blue Card.
+- After graduation: junior Data Scientist / ML or AI Engineer / Data Analyst / Software Engineer,
+  ideally with an EU Blue Card.
 - Places, in order: Trier and nearby (Luxembourg, Saarbrücken), then the rest of Germany, then Europe.
 - Remote: <fine / preferred / not wanted>
 
