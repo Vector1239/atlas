@@ -1,6 +1,11 @@
 import { selectJobs } from './job-filters.js';
 
 export const initialFilters = { search: '', kind: 'all', group: 'all', distance: 'any', city: 'all', source: 'all', workplace: 'all', language: 'all', hideSenior: false, sort: 'distance', period: 'all', category: 'all' };
+export function filtersForScope(filters, scope) {
+  return { ...filters, city: 'all', distance: 'any',
+    workplace: scope === 'remote' ? 'remote' : 'all',
+    ...(scope === 'remote' ? { kind: 'jobs', sort: 'newest', source: 'all' } : {}) };
+}
 export const placeKey = item => item.location ? `${item.location.lat},${item.location.lon}` : null;
 export function exploreTotals(data) {
   const jobs = (data.jobs || []).length, events = (data.events?.items || []).length;
@@ -32,12 +37,12 @@ export function exploreView(items, { inView = true, bounds = null, selected = nu
   }
   return result;
 }
-export function selectExplore(data, filters) {
-  // Remote roles have no place: distance and city filters don't apply to them.
-  const remote = filters.kind === 'remote', jobFilters = remote ? { ...filters, distance: 'any', city: 'all' } : filters;
-  const jobs = filters.kind === 'events' ? [] : selectJobs(data.jobs, jobFilters, data.saved_jobs).filter(job => !remote || job.remote).map(job => ({ ...job, kind: 'job', key: `job:${job.id}` }));
+const remoteSources = new Set(['Himalayas', 'Remote OK', 'Jobicy']);
+export function selectExplore(data, filters, scope) {
+  const sourceJobs = scope === 'remote' ? data.jobs.filter(job => remoteSources.has(job.source || job.source_label)) : data.jobs;
+  const jobs = filters.kind === 'events' ? [] : selectJobs(sourceJobs, filters, data.saved_jobs).map(job => ({ ...job, kind: 'job', key: `job:${job.id}` }));
   const cutoff = new Date(`${data.date}T12:00:00`); cutoff.setDate(cutoff.getDate() + Number(filters.period));
-  const events = ['jobs', 'remote'].includes(filters.kind) ? [] : (data.events?.items || []).filter(event => {
+  const events = filters.kind === 'jobs' ? [] : (data.events?.items || []).filter(event => {
     const distance = cityDistance(event.location);
     return `${event.title} ${event.city} ${event.venue} ${event.category} ${event.source}`.toLowerCase().includes(filters.search.trim().toLowerCase())
       && (filters.period === 'all' || new Date(`${event.start}T12:00:00`) <= cutoff)

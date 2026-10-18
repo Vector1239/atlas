@@ -21,9 +21,9 @@
 .filter-active-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:#769264}
 .explore-layout{display:grid;grid-template-columns:minmax(0,1fr) 305px;gap:16px;height:clamp(420px,calc(100dvh - 235px),1100px);align-items:stretch}
 .map-panel{min-width:0;border:1px solid #e0e4d9;border-radius:7px;background:#fff;overflow:hidden;display:flex;flex-direction:column}
-.map-heading{padding:9px 13px;display:flex;align-items:center;justify-content:space-between;gap:13px;min-height:43px}
+.map-heading{padding:9px 13px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:13px;min-height:43px}
 .map-heading>.text-button{font-size:10px}
-.map-presets{display:flex;gap:4px}
+.map-presets{display:flex;flex-wrap:wrap;gap:4px}
 .map-presets button{font-size:10px;color:#78836e;padding:6px 9px;border-radius:4px;transition:background .15s}
 .map-presets button:hover,.map-presets button.active{background:#eaf0e3;color:#445d37}
 .explore-map-wrap{position:relative;isolation:isolate;z-index:0;flex:1;min-height:0}

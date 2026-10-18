@@ -1,10 +1,11 @@
-"""Free remote-job boards: Remotive, Jobicy and Himalayas (public JSON, no key).
+"""Free remote-job boards: Remotive, Remote OK, Jobicy and Himalayas (public JSON, no key).
 
 Their terms ask for a link back to the listing on their site and their name as the source;
 every job keeps the board's own URL and source name. Remotive asks for at most 4 requests a
 day, Jobicy for at most one sync an hour and Himalayas refreshes daily, so each request is
-cached for 12 hours. Only roles a person living in Germany may take are kept: a US company
-hiring worldwide counts, a "USA only" role (the employer can only hire US residents) doesn't.
+cached for 24 hours. Known location restrictions must include Germany or a broader region:
+a US company hiring worldwide counts, a "USA only" role does not. Missing Remote OK
+locations remain explicitly unconfirmed.
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ import urllib.parse
 import gl_common as gl
 from job_providers import safe_link
 
-CACHE_SECONDS = 12 * 3600
+CACHE_SECONDS = 24 * 3600
 ELIGIBLE = re.compile(r"worldwide|anywhere|global|europe|\beu\b|emea|germany|deutschland|\bdach\b|\bcet\b|cest|central europe", re.I)
 GERMANY = re.compile(r"germany|deutschland|\bdach\b", re.I)
 PERIODS = {"hour": "HOUR", "hourly": "HOUR", "month": "MONTH", "monthly": "MONTH", "year": "YEAR", "yearly": "YEAR", "annual": "YEAR"}
@@ -28,19 +29,55 @@ DEFAULTS = {"enabled": True, "remotive_categories": ["data", "software-dev"],
 
 
 def _cached(url):
-    """One shared cache for both boards; failures are not cached, so a later refresh retries."""
+    """Share a daily cache with the app; back off failures and reuse saved data."""
     path = gl.state_dir() / "remote_boards_cache.json"
     with gl.file_lock(path):
         cache = gl.load_json(path, {})
         entry = cache.get(url, {})
-        if time.time() - entry.get("at", 0) < CACHE_SECONDS:
+        now = time.time()
+        if now - entry.get("at", 0) < CACHE_SECONDS:
             return entry["data"], True
-    data = gl.http_json(url, timeout=20)
-    with gl.file_lock(path):
-        cache = {k: v for k, v in gl.load_json(path, {}).items() if time.time() - v.get("at", 0) < 2 * CACHE_SECONDS}
-        cache[url] = {"at": time.time(), "data": data}
+        if entry.get("retry_at", 0) > now:
+            if "data" in entry:
+                return entry["data"], True
+            raise ValueError("Remote source temporarily unavailable; retry after one hour.")
+        try:
+            data = gl.http_json(url, timeout=15)
+            rows = data if isinstance(data, list) else data.get("jobs") if isinstance(data, dict) else None
+            if not isinstance(rows, list):
+                raise ValueError("Unexpected jobs response")
+        except Exception:
+            cache[url] = {**entry, "retry_at": now + 3600}
+            gl.save_json(path, cache)
+            if "data" in entry:
+                return entry["data"], True
+            raise
+        cache = {k: v for k, v in cache.items() if now - v.get("at", 0) < 30 * CACHE_SECONDS}
+        cache[url] = {"at": now, "data": data}
         gl.save_json(path, cache)
     return data, False
+
+
+def remote_date(value):
+    """Accept ISO dates and the second/millisecond epochs used by job feeds."""
+    try:
+        if isinstance(value, (int, float)):
+            return dt.datetime.fromtimestamp(value / 1000 if value > 1e11 else value, dt.timezone.utc).isoformat()
+        return dt.datetime.fromisoformat(value.replace("Z", "+00:00")).isoformat() if isinstance(value, str) and value else ""
+    except (ValueError, OverflowError, OSError):
+        return ""
+
+
+def remoteok(item):
+    if not isinstance(item, dict) or not item.get("id") or not isinstance(item.get("position"), str) or not item["position"].strip():
+        return None
+    link = safe_link(item.get("url"))
+    if not link:
+        return None
+    # An omitted location isn't proof of worldwide eligibility.
+    return _job("Remote OK", item["id"], item["position"], item.get("company", ""),
+                item.get("location") or "Location not specified", remote_date(item.get("date") or item.get("epoch")),
+                link, item.get("description", ""), region_name=item.get("location") or "Location not specified")
 
 
 def _job(source, source_id, title, company, scope, posted, url, text, **extra):
@@ -83,11 +120,10 @@ def jobicy(item):
 def himalayas(item):
     if not isinstance(item, dict) or not isinstance(item.get("guid"), str) or not item.get("title"):
         return None
-    if isinstance(item.get("expiryDate"), (int, float)) and item["expiryDate"] < time.time():
+    expiry = remote_date(item.get("expiryDate"))
+    if expiry and expiry[:10] < dt.datetime.now(dt.timezone.utc).date().isoformat():
         return None
-    posted = ""
-    if isinstance(item.get("pubDate"), (int, float)):
-        posted = dt.datetime.fromtimestamp(item["pubDate"], dt.timezone.utc).date().isoformat()
+    posted = remote_date(item.get("pubDate"))
     salary = {}
     period = PERIODS.get(str(item.get("salaryPeriod") or "annual").lower())
     low, high = item.get("minSalary"), item.get("maxSalary")
@@ -95,13 +131,17 @@ def himalayas(item):
         salary = {"min": low if isinstance(low, (int, float)) else None, "max": high if isinstance(high, (int, float)) else None,
                   "currency": str(item.get("currency") or "")[:3].upper(), "period": period}
     # No location restriction means the role is open worldwide.
-    places = [gl.clean_text(p, 40) for p in item.get("locationRestrictions") or [] if isinstance(p, str)]
+    places = [gl.clean_text(p if isinstance(p, str) else p.get("name", ""), 60)
+              for p in item.get("locationRestrictions") or [] if isinstance(p, (str, dict))]
+    scope = ", ".join(places[:8]) or "Worldwide"
+    zones = item.get("timezoneRestrictions") or []
+    zone_note = " · Timezones: " + ", ".join(str(z) for z in zones) if zones else ""
     words = lambda name: [gl.clean_text(v, 60) for v in item.get(name) or [] if isinstance(v, str)][:6]
-    return _job("Himalayas", item["guid"], item["title"], item.get("companyName", ""), ", ".join(places[:8]) or "Worldwide",
+    return _job("Himalayas", item["guid"], item["title"], item.get("companyName", ""), scope,
                 posted, item["guid"] if safe_link(item["guid"]) else item.get("applicationLink", ""),
                 item.get("description") or item.get("excerpt") or "", salary=salary,
                 job_types=[gl.clean_text(item["employmentType"], 40)] if isinstance(item.get("employmentType"), str) else [],
-                tags=words("categories") + words("parentCategories"))
+                tags=words("categories") + words("parentCategories"), region_name=scope + zone_note)
 
 
 def fetch_remote(cfg, rings, matcher, status):
@@ -117,6 +157,8 @@ def fetch_remote(cfg, rings, matcher, status):
     requests += [("Himalayas", "https://himalayas.app/jobs/api/search?" + urllib.parse.urlencode(
                       {"q": query, "country": options["himalayas_country"], "sort": "recent"}),
                   lambda data: data.get("jobs") or [], himalayas) for query in options["himalayas_queries"]]
+    if options.get("remoteok", True):
+        requests.append(("Remote OK", "https://remoteok.com/api", lambda data: data, remoteok))
     cutoff = (dt.datetime.now(dt.timezone.utc).date() - dt.timedelta(days=cfg.get("jobs", {}).get("max_age_days", 14))).isoformat()
     found, seen, counts, errors, outside = [], set(), {}, [], 0
     for board, url, rows, normalize in requests:
@@ -126,7 +168,7 @@ def fetch_remote(cfg, rings, matcher, status):
         except Exception as exc:
             errors.append(f"{board}: {gl.short_error(exc)}")
             continue
-        for item in rows(data) if isinstance(data, dict) else []:
+        for item in rows(data) if isinstance(data, (dict, list)) else []:
             job = normalize(item)
             if not job or not safe_link(job["url"]):
                 continue
@@ -135,7 +177,7 @@ def fetch_remote(cfg, rings, matcher, status):
                 continue
             if not matcher.relevant(job["title"], " ".join(job.get("tags", []))):
                 continue
-            if job["remote_scope"] and not ELIGIBLE.search(job["remote_scope"]):
+            if job["remote_scope"] and job["remote_scope"] != "Location not specified" and not ELIGIBLE.search(job["remote_scope"]):
                 outside += 1
                 continue
             seen.add(key)

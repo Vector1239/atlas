@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { exploreTotals, exploreView, initialFilters, selectExplore, groupPlaces, inBounds, cityDistance, placeKey } from '../src/explore-filters.js';
+import { exploreTotals, exploreView, initialFilters, filtersForScope, selectExplore, groupPlaces, inBounds, cityDistance, placeKey } from '../src/explore-filters.js';
 const trier = { lat:49.75565, lon:6.63935 }, berlin = { lat:52.52437, lon:13.41053 };
 const job = { id:'j1', title:'Analyst', title_en:'Analyst', company:'Team', city:'Trier', source_label:'Board', distance_from_trier:2, flags:['student-job'], location:trier };
 const event = { id:'e1', title:'Concert', city:'Trier', source:'City', category:'Music', start:'2026-10-20', location:trier };
@@ -18,8 +18,6 @@ test('layer, radius and event dates combine without treating unknown distance as
  assert.deepEqual(selectExplore(data,{...initialFilters,distance:'25'}).map(i=>i.id),['j1','e1']);
  assert.equal(selectExplore(data,{...initialFilters,kind:'jobs',group:'saved'}).length,1);
  assert.equal(selectExplore(data,{...initialFilters,kind:'events',category:'Culture'}).length,0);
- const remote={...data,jobs:[...data.jobs,{...job,id:'r1',city:'Remote',location:null,distance_from_trier:null,remote:true}]};
- assert.deepEqual(selectExplore(remote,{...initialFilters,kind:'remote',distance:'25'}).map(i=>i.id),['r1']);
  assert.equal(cityDistance(trier),0);
  assert.ok(cityDistance(berlin)>500);
 });
@@ -59,4 +57,19 @@ test('every locally loaded match remains visible beyond the old twenty-card limi
  assert.equal(exploreTotals(loaded).total,236);
  assert.equal(exploreView(matches,{inView:false}).visible.length,236);
  assert.equal(exploreView(matches).visible.filter(item=>item.kind==='job').length,226);
+});
+
+test('one Remote preset shows the three remote boards and clears geographic and source constraints', () => {
+ const filters = filtersForScope({...initialFilters,kind:'events',city:'Trier',distance:'25',source:'Arbeitnow'}, 'remote');
+ const remotes = ['Himalayas','Remote OK','Jobicy'].map((source,i) => ({...job,id:`remote${i}`,source,source_label:source,remote:true,city:'Remote',location:null,distance_from_trier:null}));
+ const otherRemote = {...job,id:'otherRemote',source:'Arbeitnow',source_label:'Arbeitnow',remote:true};
+ const jobs = [job,...remotes,otherRemote];
+ const items = selectExplore({...data,jobs},filters,'remote');
+ assert.deepEqual(items.map(i=>i.id),remotes.map(i=>i.id));
+ assert.equal(filters.sort,'newest');
+ assert.equal(filters.source,'all');
+ assert.deepEqual(exploreView(items,{inView:false}).visible,items);
+ const home = filtersForScope(filters,'trier');
+ assert.equal(home.workplace,'all');
+ assert.equal(selectExplore({...data,jobs},home,'trier').length,jobs.length);
 });

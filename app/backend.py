@@ -487,7 +487,7 @@ def public_state():
     result["home"] = {"city": home.get("city", "Trier"), "lat": home.get("lat", 49.7499),
                       "lon": home.get("lon", 6.6371), "precision": "saved base"}
     result["translation"] = TRANSLATION_STATUS.copy()
-    labels = ["Bundesagentur für Arbeit", "Arbeitnow"]
+    labels = ["Bundesagentur für Arbeit", "Arbeitnow", "Himalayas", "Remote OK", "Jobicy", "Remotive"]
     labels += sorted({job["source_label"] for job in result["jobs"]} - set(labels))
     result["job_sources"] = [{"name": name, "count": sum(j["source_label"] == name for j in result["jobs"])} for name in labels]
     result["job_provider"] = job_providers.provider_state()

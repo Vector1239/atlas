@@ -122,7 +122,7 @@ export default function DiscoveryMap({ groups, selected, onSelect, onBounds, onH
     }).catch(error=>{if(error.name!=='AbortError')setOutlineError(true);});
     return()=>{controller.abort();countryFill?.remove();stateLines?.remove();countryLines?.remove();refreshLabels.current=()=>{};};
   },[attempt,home.lat,home.lon]);
-  useEffect(()=>{if(map.current)map.current.fitBounds(withHomeBounds(scope.bounds || mapPresets[scope.name],home),{padding:[60,60],maxZoom:9,animate:false});},[scope,home.lat,home.lon]);
+  useEffect(()=>{if(map.current)map.current.fitBounds(withHomeBounds(scope.bounds || mapPresets[scope.name === 'remote' ? 'europe' : scope.name],home),{padding:[60,60],maxZoom:9,animate:false});},[scope,home.lat,home.lon]);
   useEffect(()=>{if(focus && map.current)map.current.fitBounds(withHomeBounds([[focus.lat,focus.lon]],home),{padding:[80,80],maxZoom:9,animate:false});},[focus,home.lat,home.lon]);
   useEffect(()=>{
     if(!pins.current)return; pins.current.clearLayers();

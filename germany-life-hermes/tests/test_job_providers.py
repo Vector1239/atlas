@@ -182,7 +182,7 @@ print(json.dumps(job_providers.provider_state()))
              "minSalary": 40, "maxSalary": 60, "currency": "USD", "salaryPeriod": "hourly"},
             {"guid": "https://himalayas.app/companies/e/jobs/5", "title": "Data Analyst", "companyName": "E",
              "locationRestrictions": ["United States"], "pubDate": stamp, "description": "SQL"}]}
-        cfg = {"jobs": {"include": ["data", "machine learning"], "remote": {"remotive_categories": ["data"],
+        cfg = {"jobs": {"include": ["data", "machine learning"], "remote": {"remoteok": False, "remotive_categories": ["data"],
                                                                             "jobicy_industries": ["data-science"], "jobicy_geos": ["europe"],
                                                                             "himalayas_queries": ["data"]}}}
         boards = {"remotive": remotive, "jobicy": jobicy, "himalayas": himalayas}
@@ -190,7 +190,7 @@ print(json.dumps(job_providers.provider_state()))
             status = []
             jobs = remote_boards.fetch_remote(cfg, {2, 3}, job_scan.Matcher(cfg["jobs"]), status)
             remote_boards.fetch_remote(cfg, {2, 3}, job_scan.Matcher(cfg["jobs"]), [])
-            self.assertEqual(fetch.call_count, 3)  # the second scan is served from the 12-hour cache
+            self.assertEqual(fetch.call_count, 3)  # the second scan is served from the 24-hour cache
             self.assertEqual(remote_boards.fetch_remote(cfg, {0, 1}, job_scan.Matcher(cfg["jobs"]), []), [])
         self.assertEqual([(j["source"], j["url"], j["ring"]) for j in jobs],
                          [("Remotive", "https://remotive.com/remote-jobs/data/1", 3), ("Jobicy", "https://jobicy.com/jobs/3", 2),
