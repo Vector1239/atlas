@@ -20,8 +20,6 @@
 .explore-more-filters>.text-button{padding-bottom:10px}
 .filter-active-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:#769264}
 .explore-layout{display:grid;grid-template-columns:minmax(0,1fr) 305px;gap:16px;height:clamp(420px,calc(100dvh - 235px),1100px);align-items:stretch}
-.explore-layout.map-only{grid-template-columns:minmax(0,1fr)}
-.explore-results[hidden]{display:none}
 .map-panel{min-width:0;border:1px solid #e0e4d9;border-radius:7px;background:#fff;overflow:hidden;display:flex;flex-direction:column}
 .map-heading{padding:9px 13px;display:flex;align-items:center;justify-content:space-between;gap:13px;min-height:43px}
 .map-heading>.text-button{font-size:10px}
@@ -129,3 +127,10 @@
 @media(min-width:1600px){.explore-layout{grid-template-columns:minmax(0,1fr) 335px}}
 @media(max-width:1050px){.content.explore-content{padding:18px 16px}.explore-layout{grid-template-columns:1fr;height:auto}.map-panel{height:clamp(480px,68dvh,750px)}.explore-results{max-height:650px}.explore-result-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.explore-toolbar-top{gap:12px}.explore-toolbar-top .search{width:180px}.explore-context>div{grid-template-columns:1fr 1fr}}
 @media(max-width:640px){.explore-heading{flex-direction:row;align-items:center}.explore-heading h1{font-size:27px}.explore-heading p{font-size:10px;max-width:210px;line-height:1.7}.explore-toolbar-top{flex-wrap:wrap;gap:8px 12px;padding:0 0 11px}.explore-toolbar-top .tabs{flex:1}.explore-toolbar-top .tabs button{padding:13px 0 10px;font-size:10px}.explore-toolbar-top .compact-distance{order:3;width:130px}.explore-toolbar-top .search{order:4;flex:1;width:100%;max-width:none}.explore-toolbar{padding:0 12px}.explore-result-list{grid-template-columns:1fr}.map-heading{padding:9px 10px}.map-presets button{font-size:9px;padding:6px 7px}.map-legend{gap:9px}.map-legend .check-label{font-size:8px}.explore-context>div{grid-template-columns:1fr}.headlines .card-heading{gap:10px}.headlines .card-heading>.text-button{font-size:9px}}
+
+/* Full-width map with matching listings flowing in the page below it. */
+.explore-layout.map-grid{grid-template-columns:minmax(0,1fr);height:auto;gap:24px}
+.map-grid>.map-panel{height:clamp(420px,calc(100dvh - 235px),1100px)}
+.map-grid>.explore-results{overflow:visible;max-height:none;padding:0}
+.map-grid .explore-result-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));align-items:start;gap:16px}
+.map-grid .explore-listing .job-listing h2{font-size:17px;line-height:1.5}
