@@ -6,10 +6,6 @@ function shown(url) {
   try { const parsed = new URL(url); return parsed.protocol === 'https:' ? parsed.href.slice(8) : parsed.href; } catch { return url || ''; }
 }
 
-function host(url) {
-  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; }
-}
-
 function tabButton(id, title, { loading = false, closable = true } = {}) {
   const tab = document.createElement('div');
   tab.className = 'tab' + (state.active === id ? ' selected' : '') + (loading ? ' loading' : '');
@@ -55,15 +51,17 @@ function render() {
   $('lock').classList.toggle('insecure', page.url.startsWith('http:'));
   $('external').disabled = !page.url;
   if (document.activeElement !== address) address.value = shown(page.url);
+  const translation = page.translation || {};
   const foreign = page.language && !/^en\b/i.test(page.language);
-  $('translate').classList.toggle('on', page.translated);
-  $('translate').classList.toggle('suggested', Boolean(foreign) && !page.translated);
-  $('translate-label').textContent = page.translated ? 'Show original' : 'Translate';
-  $('translate').title = page.translated ? 'Show the page in its original language' : 'Translate this page to English with Google Translate';
+  $('translate').classList.toggle('on', Boolean(translation.on));
+  $('translate').classList.toggle('suggested', Boolean(foreign) && !translation.on);
+  $('translate-label').textContent = translation.on ? 'Show original' : 'Translate';
+  $('translate').title = translation.on ? 'Show the page in its original language' : 'Translate this page to English (Microsoft Translator). Right-click for options.';
   $('translate').disabled = !page.url;
-  const note = page.failure || (page.translated ? `Translated by Google from ${host(page.url)}` : '');
+  const note = page.failure || translation.failure
+    || (translation.on ? (translation.busy ? 'Translating…' : `Translated${translation.from ? ` from ${translation.from}` : ''} by Microsoft Translator`) : '');
   $('note').textContent = document.activeElement === address ? '' : note;
-  $('note').classList.toggle('failure', Boolean(page.failure));
+  $('note').classList.toggle('failure', Boolean(page.failure || translation.failure));
 }
 
 window.atlasBrowser.onState(next => { state = next; render(); });
@@ -73,6 +71,7 @@ $('back').onclick = () => window.atlasBrowser.command('back');
 $('forward').onclick = () => window.atlasBrowser.command('forward');
 $('reload').onclick = () => window.atlasBrowser.command(state.page && state.page.loading ? 'stop' : 'reload');
 $('translate').onclick = () => window.atlasBrowser.command('translate');
+$('translate').oncontextmenu = event => { event.preventDefault(); window.atlasBrowser.command('translate-options'); };
 $('external').onclick = () => window.atlasBrowser.command('external');
 $('address-form').onsubmit = event => { event.preventDefault(); window.atlasBrowser.command('go', address.value); address.blur(); };
 address.onfocus = () => { if (state.page) address.value = state.page.url; address.select(); render(); };
