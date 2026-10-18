@@ -7,6 +7,8 @@ import math
 from pathlib import Path
 import re
 
+from job_language import german_requirement
+
 CONTENT = Path(__file__).parent / "content"
 TITLE_TRANSLATIONS = json.loads((CONTENT / "job-translations.json").read_text())
 EVENT_CATALOG = json.loads((CONTENT / "events.json").read_text())
@@ -122,9 +124,9 @@ def clean_gender(title):
 
 
 def timezone_summary(values):
-    """Human-readable UTC offsets; accept both legacy numeric and API string values."""
+    """Timezone eligibility relative to Germany; accept saved numeric and API string offsets."""
     if not values:
-        return "All time zones", "All time zones"
+        return "Germany time supported", "Any time zone, including Germany (CET in winter / CEST in summer)."
     minutes = set()
     for value in values:
         raw = str(value).strip().upper().removeprefix("UTC").removeprefix("GMT")
@@ -144,10 +146,20 @@ def timezone_summary(values):
     # Himalayas sends every inhabited UTC offset even for unrestricted roles.
     worldwide = {h * 60 for h in range(-11, 15)} | {-570, -210, 210, 270, 330, 345, 390, 525, 570, 630, 765}
     if worldwide <= minutes:
-        return "All time zones", "All time zones"
-    labels = [f"UTC{'+' if n >= 0 else '-'}{abs(n) // 60:02d}:{abs(n) % 60:02d}" for n in sorted(minutes)]
-    details = ", ".join(labels)
-    return (details if len(labels) <= 3 else f"{len(labels)} time zones · see details"), details
+        return "Germany time supported", "Any time zone, including Germany (CET in winter / CEST in summer)."
+    def relative(n):
+        delta = n - 60  # Himalayas uses standard/winter offsets for country eligibility.
+        if delta == 0:
+            return "Germany time (CET / CEST)"
+        hours, mins = divmod(abs(delta), 60)
+        amount = (f"{hours} hour{'s' if hours != 1 else ''}" if hours else "")
+        if mins:
+            amount += (" " if amount else "") + f"{mins} minutes"
+        return f"{amount} {'ahead of' if delta > 0 else 'behind'} Germany (winter)"
+    details = "; ".join(relative(n) for n in sorted(minutes))
+    label = "Germany time supported" if 60 in minutes else relative(next(iter(minutes))) if len(minutes) == 1 else "Different from Germany time · see details"
+    return label, details
+
 
 
 def enrich_job(job, translations=None):
@@ -157,6 +169,12 @@ def enrich_job(job, translations=None):
     result["title_en"] = translated or (clean_gender(title) if not GERMAN_TITLE.search(title) else None)
     result["translation_needed"] = result["title_en"] is None
     result["flags"] = list(job.get("flags", []))
+    result["german_requirement"] = german_requirement(title + ". " + (job.get("text") or ""))
+    german = result["german_requirement"]
+    if german["status"] == "required" and "german-required" not in result["flags"]:
+        result["flags"].append("german-required")
+    elif german["status"] in ("preferred", "not_required", "mentioned"):
+        result["flags"] = [flag for flag in result["flags"] if flag != "german-required"]
     if re.search(r"werkstudi|werkstudent|duales studium|b\.sc\.", title, re.I) and "student-job" not in result["flags"]:
         result["flags"].append("student-job")
     where = job.get("where", "")

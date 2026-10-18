@@ -19,6 +19,7 @@ import urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gl_common as gl  # noqa: E402
+from job_language import german_requirement
 from job_providers import fetch_jsearch  # noqa: E402
 from remote_boards import fetch_remote  # noqa: E402
 
@@ -62,7 +63,8 @@ class Matcher:
             flags.append("student-job")
         if self._any(self.senior, title):
             flags.append("senior")
-        if text and self._any(self.german, text):
+        german = german_requirement(title + ". " + text)
+        if german["status"] == "required" or german["status"] == "unknown" and text and self._any(self.german, text):
             flags.append("german-required")
         english = gl.looks_english(text)
         if english is True:

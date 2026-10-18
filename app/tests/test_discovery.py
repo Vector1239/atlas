@@ -5,7 +5,7 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path[:0] = [str(Path(__file__).resolve().parents[1]), str(Path(__file__).resolve().parents[2] / 'germany-life-hermes/scripts')]
 import discovery
 
 
@@ -102,17 +102,29 @@ class DiscoveryTests(unittest.TestCase):
                'remote_scope':'Worldwide', 'region_name':'Worldwide · Timezones: ' + ', '.join(map(str,offsets))}
         old = discovery.enrich_job(job)
         self.assertEqual(old['region_name'],'Worldwide')
-        self.assertEqual(old['timezone_label'],'All time zones')
+        self.assertEqual(old['timezone_label'],'Germany time supported')
         self.assertIsNone(old['location'])
         fresh = discovery.enrich_job({**job,'remote_timezones':['UTC+1','UTC+5:30']})
-        self.assertEqual(fresh['timezone_label'],'UTC+01:00, UTC+05:30')
+        self.assertEqual(fresh['timezone_label'],'Germany time supported')
+        self.assertIn('4 hours 30 minutes ahead of Germany', fresh['timezone_details'])
         germany = discovery.enrich_job({**job,'remote_scope':'Germany','remote_timezones':[1]})
         self.assertEqual(germany['region_name'],'Germany')
-        self.assertEqual(germany['timezone_label'],'UTC+01:00')
+        self.assertEqual(germany['timezone_label'],'Germany time supported')
         restricted = discovery.timezone_summary([-8,-7,-6,-5])
-        self.assertEqual(restricted[0],'4 time zones · see details')
-        self.assertIn('UTC-08:00',restricted[1])
-        self.assertEqual(discovery.timezone_summary([])[0],'All time zones')
+        self.assertEqual(restricted[0],'Different from Germany time · see details')
+        self.assertIn('9 hours behind Germany (winter)',restricted[1])
+        self.assertEqual(discovery.timezone_summary([])[0],'Germany time supported')
+
+    def test_german_level_is_added_to_saved_jobs_and_preferences_are_separate(self):
+        base = {'title':'Engineer','source':'Himalayas','city':'Remote','flags':[]}
+        result = discovery.enrich_job({**base,'text':'German B1 required, English C1 preferred.'})
+        self.assertEqual(result['german_requirement']['label'],'German B1 required')
+        self.assertIn('german-required',result['flags'])
+        abbreviation = discovery.enrich_job({**base,'text':'Deutsch-Kenntnisse (mind. B1 Level) bringst du mit.'})
+        self.assertEqual(abbreviation['german_requirement']['label'],'German B1 required')
+        preferred = discovery.enrich_job({**base,'flags':['german-required'],'text':'German B2 is a nice-to-have.'})
+        self.assertEqual(preferred['german_requirement']['status'],'preferred')
+        self.assertNotIn('german-required',preferred['flags'])
 
     def test_ongoing_events_kept_expired_and_cancelled_removed(self):
         base = {'title': 'Test event', 'start': '2026-10-10', 'end': '2026-10-20', 'checked_at': '2026-10-01'}

@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 import unittest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path[:0] = [str(Path(__file__).resolve().parents[1]), str(Path(__file__).resolve().parents[2] / 'germany-life-hermes/scripts')]
 import job_insights as insights
 
 
@@ -59,6 +59,15 @@ class MarketTests(unittest.TestCase):
         self.assertEqual({r['name']:r['count'] for r in result['currencies']},{'EUR':2,'USD':1})
         self.assertEqual(result['examples'][1]['currency'],'USD')
         self.assertEqual(insights.pay({},'Salary: 5000 EUR per year'),None)
+
+    def test_german_levels_are_counted_from_descriptions_even_without_saved_flags(self):
+        result = insights.analyze([
+            {'title':'Engineer','text':'German B1 required.'},
+            {'title':'Engineer','text':'Deutschkenntnisse mindestens B2 erforderlich.'},
+            {'title':'Engineer','text':'German C1 preferred.', 'flags':['german-required']},
+            {'title':'Engineer','text':'Fluent German required.'}])
+        self.assertEqual(result['language']['german_required'],3)
+        self.assertEqual({r['name']:r['count'] for r in result['language']['levels']},{'B1':1,'B2':1})
 
     def test_empty_dataset_does_not_invent_requirements(self):
         result = insights.analyze([])

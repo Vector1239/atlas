@@ -14,7 +14,7 @@ Atlas brings your existing Germany-life project and Hermes Agent into one local 
 - **Ask Atlas:** one continuing Hermes conversation with local Gemma, web search/extraction, memory and the Germany-life skills. Hermes keeps the conversation itself; **New conversation** starts a fresh one. Searches contact external search providers/sites; model inference stays local. Commands that need approval are declined automatically.
 - **Settings:** edit your profile, change reasoning effort, start or stop Hermes and Gemma, manage routines, check sources, and install app updates.
 
-The version (currently 1.12.7) is shown at the bottom of the sidebar and under **Atlas → About Atlas**. It is set in `app/package.json`; bump it there when you change the app.
+The version (currently 1.12.8) is shown at the bottom of the sidebar and under **Atlas → About Atlas**. It is set in `app/package.json`; bump it there when you change the app.
 
 ## Development and delivery
 
@@ -25,11 +25,21 @@ Atlas app, run its updater, replace `/Applications/Atlas.app`, or restart the
 installed app as part of source changes. The user updates Atlas manually.**
 Building and testing the repository does not install the app.
 
-Himalayas timezone values such as `-11`, `1` and `5.5` are UTC offsets in hours,
-not a countdown. Atlas shows unrestricted listings as **All time zones** and
-restricted ones as clock offsets such as **UTC+01:00** or **UTC+05:30**. Longer
-restricted lists are expanded in job details. This also fixes already-saved
-listings on display without requiring a feed refresh.
+Himalayas timezone values such as `-11`, `1` and `5.5` describe location
+eligibility, not working hours. Atlas shows **Germany time supported** when the
+source allows Germany's standard timezone, including unrestricted roles.
+Other zones are described relative to Germany in the job details. These
+comparisons use winter/standard offsets, as Himalayas does for country
+eligibility; Germany observes CET in winter and CEST in summer. This works for
+already-saved listings without requiring a feed refresh.
+
+German requirements are read from job titles and descriptions across all boards,
+including Himalayas. Stated CEFR levels (A1–C2), ranges and `+` are displayed as
+badges such as **German B1 required**. Preferences, optional German and explicit
+“not required” wording are kept separate. A nearby English level is not assigned
+to German, and “fluent” alone is never converted into a guessed CEFR level.
+Job details show the matching source text; Job market also counts required
+German levels from described postings.
 
 Job market counts each skill once per loaded posting, across titles,
 descriptions and provider skill/tag fields; skill percentages use all loaded

@@ -104,6 +104,7 @@ export default function JobMarket({ data, act, navigate }) {
           <div><dt>Remote or hybrid{market.remote > 0 && <button className="text-button" onClick={() => navigate('remote')}>See remote roles</button>}</dt><dd>{share(market.remote, market.total)}<small>{market.remote} of {market.total} roles</small></dd></div>
           <div><dt>Visa sponsorship listed</dt><dd>{share(market.visa, market.total)}<small>{market.visa} of {market.total} roles</small></dd></div>
         </dl>
+        {!!market.language.levels?.length && <><h3 className="market-subhead">Stated German levels</h3><div className="tags">{market.language.levels.map(row => <span className="badge" key={row.name}>{row.name} · {row.count}</span>)}</div></>}
         <p className="form-help">Language counts cover described postings only. A missing German requirement does not confirm that English alone is sufficient.</p>
         {market.companies.length > 0 && <><h3 className="market-subhead">Hiring more than once</h3><div className="tags">{market.companies.map(row => <span className="badge" key={row.name}>{row.name} · {row.count}</span>)}</div></>}
       </section>

@@ -10,6 +10,8 @@ import math
 import re
 import statistics
 
+from job_language import german_requirement
+
 FAMILIES = [
     ("Research & university", r"wissenschaftlich|hilfskraft|\bhiwi\b|research assistant|doktorand|\bph\.?d\b|postdoc|promotion|forscher|researcher"),
     ("Data engineering", r"data engineer|daten ?ingenieur|analytics engineer|data architect|datenarchitekt|\betl\b|data platform|big data|datenbank|database"),
@@ -218,8 +220,9 @@ def analyze(jobs, profile=""):
                                       " ".join(job.get("skills") or []), job.get("text", "")]))
         years = experience_years(job, job.get("text", ""))
         level = seniority(job, years)
+        german = german_requirement((job.get("title") or "") + ". " + (job.get("text") or ""))
         rows.append({"job": job, "family": family(job), "skills": skills(text), "years": years, "level": level,
-                     "pay": pay(job, job.get("text", "")), "described": bool((job.get("text") or "").strip()), "skill_evidence": bool((job.get("text") or "").strip() or job.get("tags") or job.get("skills") or skills(text))})
+                     "german": german, "pay": pay(job, job.get("text", "")), "described": bool((job.get("text") or "").strip()), "skill_evidence": bool((job.get("text") or "").strip() or job.get("tags") or job.get("skills") or skills(text))})
     described = [row for row in rows if row["described"]]
     evidence = [row for row in rows if row["skill_evidence"]]
     have = set(profile_skills(profile))
@@ -257,7 +260,8 @@ def analyze(jobs, profile=""):
                 "currencies": _top(collections.Counter(row["pay"]["currency"] for row in paid), len(paid)), "hourly": _spread(hourly), "annual": _spread(yearly),
                 "examples": [{"id": row["job"].get("id"), "title": row["job"].get("title_en") or row["job"].get("title"),
                               "company": row["job"].get("company"), **row["pay"]} for row in paid[:12]]},
-        "language": {"described": len(described), "german_required": flags("german-required"),
+        "language": {"described": len(described), "german_required": sum(row["german"]["status"] == "required" or row["german"]["status"] == "unknown" and "german-required" in row["job"].get("flags", []) for row in described),
+                     "levels": _top(collections.Counter(row["german"]["level"] for row in described if row["german"]["status"] == "required" and row["german"]["level"]), len(described)),
                      "posting_in_german": flags("posting-in-german"), "english": flags("english")},
         "remote": sum(bool(row["job"].get("remote")) for row in rows),
         "visa": sum(bool(row["job"].get("visa")) for row in rows),
