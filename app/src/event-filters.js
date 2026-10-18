@@ -1,6 +1,6 @@
 // Event-only filters for the Events tab: dates, place, type and genre, each with live counts.
 export const whenOptions = [['any', 'Any date'], ['today', 'Today'], ['weekend', 'This weekend'], ['7', 'Next 7 days'], ['30', 'Next 30 days']];
-export const eventSorts = [['soonest', 'Soonest first'], ['nearest', 'Nearest home first']];
+export const eventSorts = [['nearest', 'Nearest home first'], ['soonest', 'Soonest first']];
 
 const day = value => new Date(`${value}T12:00:00`);
 const iso = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -45,6 +45,8 @@ export function eventFacets(events, filters, today) {
     countries: tally(without('country'), 'country'), cities: tally(inCountry, 'city') };
 }
 
+export const placeLabel = event => [event.city, event.country].filter(Boolean).join(', ') || 'Place to be confirmed';
+
 export function dayLabel(event, today) {
   if (event.start < today) return 'On now';
   if (event.start === today) return 'Today';
@@ -53,3 +55,15 @@ export function dayLabel(event, today) {
 }
 
 export const activeEventFilters = filters => ['when', 'category', 'genre', 'country', 'city'].filter(key => filters[key] && !['all', 'any'].includes(filters[key])).length;
+
+// The Events tab remembers its filters (and that it was open) across pages and restarts, on this Mac only.
+const STORE = 'atlas.explore.events', remembered = ['kind', 'when', 'category', 'genre', 'country', 'city', 'eventSort'];
+export function savedEventFilters(storage = globalThis.localStorage) {
+  try {
+    const saved = JSON.parse(storage?.getItem(STORE) || '{}');
+    return Object.fromEntries(remembered.filter(key => typeof saved[key] === 'string').map(key => [key, saved[key]]));
+  } catch { return {}; }
+}
+export function saveEventFilters(filters, storage = globalThis.localStorage) {
+  try { storage?.setItem(STORE, JSON.stringify(Object.fromEntries(remembered.map(key => [key, filters[key]])))); } catch { /* storage unavailable */ }
+}

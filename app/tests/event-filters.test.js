@@ -33,3 +33,21 @@ test('day headings name today, tomorrow and events already on', () => {
   assert.equal(dayLabel(events[3], today), 'On now');
   assert.equal(dayLabel(events[1], today), 'Saturday 24 October');
 });
+test('nearest home is the default order: whole cities by distance, each city in date order', () => {
+  const trier = { lat:49.7557, lon:6.6394 }, venue = { lat:49.7601, lon:6.6447 }, lux = { lat:49.61, lon:6.13 };
+  const items = [ev('t-city-nov', { city:'Trier', start:'2026-11-05', end:'2026-11-05', location:trier }), ev('lux', { city:'Luxembourg', country:'Luxembourg', start:'2026-10-21', end:'2026-10-21', location:lux }),
+    ev('t-venue-oct', { city:'Trier', start:'2026-10-21', end:'2026-10-21', location:venue }), ev('t-city-oct', { city:'Trier', start:'2026-10-22', end:'2026-10-22', location:trier })];
+  assert.equal(initialFilters.eventSort, 'nearest');
+  assert.deepEqual(selectExplore({ date:today, jobs:[], events:{ items } }, { ...initialFilters, kind:'events' }).map(e => e.id), ['t-venue-oct', 't-city-oct', 't-city-nov', 'lux']);
+  assert.deepEqual(selectExplore({ date:today, jobs:[], events:{ items } }, { ...initialFilters, kind:'events', eventSort:'soonest' }).map(e => e.id), ['lux', 't-venue-oct', 't-city-oct', 't-city-nov']);
+});
+test('event filters are remembered between visits and bad or missing storage is ignored', async () => {
+  const { savedEventFilters, saveEventFilters } = await import('../src/event-filters.js');
+  const store = new Map(), storage = { getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, value) };
+  saveEventFilters({ ...initialFilters, kind:'events', when:'weekend', category:'Music', genre:'Jazz', country:'Germany', city:'Berlin', search:'not kept' }, storage);
+  assert.deepEqual(savedEventFilters(storage), { kind:'events', when:'weekend', category:'Music', genre:'Jazz', country:'Germany', city:'Berlin', eventSort:'nearest' });
+  store.set('atlas.explore.events', '{broken');
+  assert.deepEqual(savedEventFilters(storage), {});
+  assert.deepEqual(savedEventFilters({ getItem: () => { throw Error('blocked'); } }), {});
+  assert.doesNotThrow(() => saveEventFilters(initialFilters, undefined));
+});
