@@ -61,6 +61,32 @@ class AtlasTests(unittest.TestCase):
             urllib.request.urlopen(self.url + '/api/state')
         self.assertEqual(result.exception.code, 401)
 
+    def test_job_provider_key_is_saved_locally_and_never_returned(self):
+        secret = 'private-jsearch-test-key'
+        with self.post('/api/jobs/provider', {'host': 'openwebninja', 'key': secret}) as response:
+            result = json.load(response)
+        self.assertTrue(result['provider']['configured'])
+        self.assertNotIn(secret, json.dumps(result))
+        self.assertNotIn(secret, json.dumps(self.backend.public_state()))
+        path = self.project / 'state/job_credentials.json'
+        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        self.post('/api/jobs/provider', {'host': 'openwebninja', 'key': ''}).close()
+        self.assertFalse(self.backend.public_state()['job_provider']['configured'])
+
+    def test_job_details_only_fetch_known_listings_and_update_requirement_flags(self):
+        job = {'id': 'J-detail', 'source': 'Bundesagentur', 'source_id': '10000-test-S',
+               'title': 'Working Student Data Science', 'company': 'Example', 'ring': 0,
+               'where': 'Trier', 'posted': '', 'url': 'https://www.arbeitsagentur.de/jobsuche/jobdetail/10000-test-S', 'text': ''}
+        with patch.dict(self.backend.CACHE, {'jobs': [job]}), patch.object(self.backend.job_details, 'load', return_value={
+            'text': 'We require fluent German and Python experience.', 'detail_source': 'Bundesagentur job details'}) as fetch:
+            with self.assertRaises(urllib.error.HTTPError):
+                self.post('/api/jobs/details', {'id': 'unknown', 'url': 'http://127.0.0.1/private'})
+            fetch.assert_not_called()
+            with self.post('/api/jobs/details', {'id': 'J-detail'}) as response:
+                self.assertIn('fluent German', json.load(response)['text'])
+            self.assertIn('german-required', self.backend.CACHE['jobs'][0]['flags'])
+            self.assertIn('fluent German', self.backend.public_state()['jobs'][0]['text'])
+
     def test_briefs_use_fresh_tool_free_hermes_and_chat_keeps_its_tools(self):
         brief = self.backend.hermes_arguments('brief')
         self.assertEqual(brief[brief.index('--model')+1], 'atlas-local')

@@ -35,12 +35,14 @@ SCRIPTS = RUNTIME / "scripts" if (RUNTIME / "scripts/gl_common.py").is_file() el
 sys.path.insert(0, str(SCRIPTS))
 import gl_common as gl
 import job_scan
+import job_providers
 import morning_brief
 sys.path.insert(0, str(Path(__file__).parent))
 import discovery
 import updater
 import news_media
 import news_store
+import job_details
 import tech
 
 # package.json is the one place the version is set; Electron's About box reads it too.
@@ -79,6 +81,9 @@ DATA.setdefault("settings", {"reasoning": "none"})
 if DATA["settings"].get("model_id") != MODEL["alias"]:
     DATA["settings"].update(model_id=MODEL["alias"], reasoning="none", model_autostart=False)
 CACHE = gl.load_json(SNAPSHOT, {"news": [], "jobs": [], "weather": [], "mensa": [], "sources": []})
+# Removed providers must disappear immediately, including from older snapshots.
+CACHE["jobs"] = [job for job in CACHE.get("jobs", []) if not job.get("source", "").startswith("Adzuna")]
+CACHE["sources"] = [source for source in CACHE.get("sources", []) if not source.get("name", "").startswith("Adzuna")]
 CACHE['news'] = news_store.merge_news(CACHE.get('news', []), json.loads((Path(__file__).parent / 'content/news-recovery.json').read_text()), dt.datetime.now(dt.timezone.utc))
 TRANSLATIONS = gl.load_json(STATE_DIR / "job_translations.json", {})
 NEWS_TRANSLATIONS = gl.load_json(STATE_DIR / "news_translations.json", {})
@@ -325,8 +330,8 @@ def refresh_data():
         matcher = job_scan.Matcher(cfg.get("jobs", {}))
         status = []
         jobs = (job_scan.fetch_bundesagentur(cfg, {0, 1}, matcher, status)
-                + job_scan.fetch_arbeitnow(cfg, {0, 1}, matcher, status)
-                + job_scan.fetch_adzuna(cfg, {0, 1}, matcher, status))
+                + job_scan.fetch_arbeitnow(cfg, {0, 1, 2}, matcher, status)
+                + job_scan.fetch_jsearch(cfg, {0, 1, 2, 3}, matcher, status))
         found, seen = [], set()
         for job in sorted(jobs, key=lambda item: item["ring"]):
             key = f"{gl.norm(job['title'])}|{gl.norm(job['company'])}"
@@ -415,7 +420,7 @@ def public_state():
     labels = ["Bundesagentur für Arbeit", "Arbeitnow"]
     labels += sorted({job["source_label"] for job in result["jobs"]} - set(labels))
     result["job_sources"] = [{"name": name, "count": sum(j["source_label"] == name for j in result["jobs"])} for name in labels]
-    result["adzuna_key_missing"] = any(s.get("name") == "Adzuna" and s.get("skipped") for s in result.get("sources", []))
+    result["job_provider"] = job_providers.provider_state()
     result["deadlines"], result["deadlines_error"] = deadline_rows(today)
     result["work"] = work_summary(today.year)
     result["worklog"] = list(reversed(read_csv("worklog.csv")))
@@ -752,6 +757,24 @@ def api_post(path, body):
         if kind not in ("regular", "hiwi"):
             raise ValueError("Choose a work type.")
         return {"ok": True, "message": run_ctl(["work", "add", "--hours", str(hours), "--employer=" + validate_text(body.get("employer"), "employer"), "--date", validate_date(body.get("date", "")), "--kind", kind])}
+    if path == "/api/jobs/provider":
+        key = body.get("key", "")
+        if not isinstance(key, str):
+            raise ValueError("Enter a valid API key.")
+        job_providers.save_credentials(body.get("host", "openwebninja"), key.strip())
+        return {"ok": True, "provider": job_providers.provider_state()}
+    if path == "/api/jobs/details":
+        with LOCK:
+            job = next((dict(row) for row in CACHE.get("jobs", []) if row.get("id") == body.get("id")), None)
+        if job is None:
+            raise ValueError("This job is no longer in the current listings. Refresh Explore.")
+        details = job_details.load(job, STATE_DIR)
+        if details.get("text"):
+            with LOCK:
+                CACHE["jobs"] = [{**row, **details, "flags": job_scan.Matcher(config().get("jobs", {})).flags({**row, **details})}
+                                 if row.get("id") == job["id"] else row for row in CACHE.get("jobs", [])]
+                gl.save_json(SNAPSHOT, CACHE)
+        return {"ok": True, **details}
     if path in ("/api/jobs/rate", "/api/jobs/save"):
         job_id = body.get("id")
         if job_id not in gl.load_json(gl.data_dir() / "jobs_index.json", {}):

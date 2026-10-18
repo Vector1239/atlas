@@ -1,7 +1,7 @@
 """Collect new job postings for the job-scan cron jobs.
 
-Pulls from the Bundesagentur für Arbeit job search, Arbeitnow and (with a key)
-Adzuna, keeps postings that match config/sources.toml, drops anything already
+Pulls from the Bundesagentur für Arbeit job search, Arbeitnow and optional
+JSearch, keeps postings that match config/sources.toml, drops anything already
 sent in an earlier run, and prints the rest for the agent to rank.
 When nothing is new it ends with {"wakeAgent": false}, so Hermes skips the LLM.
 
@@ -19,6 +19,7 @@ import urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gl_common as gl  # noqa: E402
+from job_providers import fetch_jsearch  # noqa: E402
 
 RING_NAMES = {0: "Trier", 1: "Region", 2: "Germany", 3: "Europe"}
 BA_URL = "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v6/jobs"
@@ -114,7 +115,7 @@ def fetch_bundesagentur(cfg: dict, rings: set[int], matcher: Matcher, status: li
                     "city": place.get("ort", ""), "region_name": place.get("region", ""),
                     "distance_km": distance, "distance_origin": search.get("where", ""),
                     "where": where or "?", "posted": (offer.get("veroeffentlichungszeitraum") or {}).get("von")
-                    or offer.get("aktuelleVeroeffentlichungsdatum", ""),
+                    or offer.get("datumErsteVeroeffentlichung") or offer.get("aktuelleVeroeffentlichungsdatum", ""),
                     "url": f"https://www.arbeitsagentur.de/jobsuche/jobdetail/{urllib.parse.quote(refnr)}",
                     "text": "", "remote": bool(offer.get("homeofficemoeglich")), "visa": False,
                 })
@@ -168,44 +169,6 @@ def fetch_arbeitnow(cfg: dict, rings: set[int], matcher: Matcher, status: list) 
     return found
 
 
-def fetch_adzuna(cfg: dict, rings: set[int], matcher: Matcher, status: list) -> list[dict]:
-    app_id, app_key = os.environ.get("ADZUNA_APP_ID"), os.environ.get("ADZUNA_APP_KEY")
-    searches = [s for s in cfg.get("jobs", {}).get("adzuna", []) if int(s.get("ring", 2)) in rings]
-    if not searches:
-        return []
-    if not (app_id and app_key):
-        status.append("· Adzuna: skipped (no ADZUNA_APP_ID / ADZUNA_APP_KEY)")
-        return []
-    found, errors = [], []
-    for search in searches:
-        params = {"app_id": app_id, "app_key": app_key, "what": search.get("what", "data"),
-                  "results_per_page": 50, "max_days_old": cfg.get("jobs", {}).get("max_age_days", 14),
-                  "content-type": "application/json"}
-        if search.get("where"):
-            params.update({"where": search["where"], "distance": search.get("radius_km", 50)})
-        country = search.get("country", "de")
-        try:
-            payload = gl.http_json(f"https://api.adzuna.com/v1/api/jobs/{country}/search/1?"
-                                   f"{urllib.parse.urlencode(params)}")
-        except Exception as exc:
-            errors.append(f"{country}/{search.get('what')}: {gl.short_error(exc)}")
-            continue
-        for item in payload.get("results", []) or []:
-            title = gl.clean_text(item.get("title", ""))
-            if not matcher.relevant(title):
-                continue
-            found.append({
-                "source": f"Adzuna {country.upper()}", "source_id": str(item.get("id", "")),
-                "ring": int(search.get("ring", 2)), "title": title,
-                "company": gl.clean_text((item.get("company") or {}).get("display_name", "")),
-                "where": (item.get("location") or {}).get("display_name", "?"),
-                "posted": (item.get("created") or "")[:10], "url": item.get("redirect_url", ""),
-                "text": gl.clean_text(item.get("description", ""), 1500), "remote": False, "visa": False,
-            })
-    status.append(_status_line("Adzuna", len(searches), errors, len(found)))
-    return found
-
-
 def _status_line(name: str, calls: int, errors: list, kept: int) -> str:
     if errors and len(errors) == calls:
         return f"✗ {name}: all {calls} requests failed ({errors[0]})"
@@ -251,7 +214,7 @@ def run(rings: set[int], dry_run: bool) -> str:
     status: list[str] = []
     jobs = (fetch_bundesagentur(cfg, rings, matcher, status)
             + fetch_arbeitnow(cfg, rings, matcher, status)
-            + fetch_adzuna(cfg, rings, matcher, status))
+            + fetch_jsearch(cfg, rings, matcher, status))
 
     seen_path = gl.state_dir() / "seen_jobs.json"
     seen = gl.load_json(seen_path, {})

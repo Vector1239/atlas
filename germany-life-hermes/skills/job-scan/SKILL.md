@@ -1,6 +1,6 @@
 ---
 name: job-scan
-description: Rank fresh job postings (Bundesagentur für Arbeit, Arbeitnow, Adzuna) for an international MSc Data Science student at Uni Trier, and save 👍/👎 feedback on jobs by their J-xxxxx id. Use for the scheduled job-scan cron jobs, when the user asks for jobs, or when the user replies to a job with 👍, 👎 or a J-xxxxx id.
+description: Rank fresh job postings (Bundesagentur für Arbeit, Arbeitnow, optional JSearch) for an international MSc Data Science student at Uni Trier, and save 👍/👎 feedback on jobs by their J-xxxxx id. Use for the scheduled job-scan cron jobs, when the user asks for jobs, or when the user replies to a job with 👍, 👎 or a J-xxxxx id.
 version: 0.1.0
 metadata:
   hermes:

@@ -75,7 +75,7 @@ def main() -> None:
     matcher = job_scan.Matcher(cfg.get("jobs", {}))
     for name, fetch in [("Bundesagentur (ring 0 searches)", job_scan.fetch_bundesagentur),
                         ("Arbeitnow", job_scan.fetch_arbeitnow),
-                        ("Adzuna (all rings)", job_scan.fetch_adzuna)]:
+                        ("JSearch (all rings)", job_scan.fetch_jsearch)]:
         rings = {0} if fetch is job_scan.fetch_bundesagentur else {0, 1, 2, 3}
         def job_check(fetch=fetch, rings=rings):
             status: list[str] = []

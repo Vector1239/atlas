@@ -166,27 +166,49 @@ enabled = true
 pages = 3          # general listings, ~100 per page
 visa_pages = 2     # extra pages from the visa-sponsorship feed
 
-# Adzuna (optional): free key from https://developer.adzuna.com. Put ADZUNA_APP_ID and
-# ADZUNA_APP_KEY in ~/.hermes/.env and list both under terminal.env_passthrough in
-# ~/.hermes/config.yaml (see SETUP-macOS.md). Skipped without a key.
-[[jobs.adzuna]]
-ring = 1
-country = "de"
-what = "data"
-where = "Trier"
-radius_km = 150
+# Optional JSearch, as used by Dossier. OpenWeb Ninja has a free, hard-limited plan.
+# Add a key in Atlas Settings → Sources; no key is needed for the sources above.
+# One page per search, cached 24 hours; Atlas caps requests at 180 per UTC month.
+[jobs.jsearch]
+enabled = true
 
-[[jobs.adzuna]]
+[[jobs.jsearch.searches]]
+ring = 0
+country = "de"
+what = "Werkstudent Data Science"
+where = "Trier"
+radius_km = 50
+language = "de"
+
+[[jobs.jsearch.searches]]
+ring = 1
+country = "lu"
+what = "junior data scientist"
+where = "Luxembourg"
+radius_km = 50
+
+[[jobs.jsearch.searches]]
+ring = 2
+country = "de"
+what = "Werkstudent Data Science"
+where = "Germany"
+language = "de"
+
+[[jobs.jsearch.searches]]
 ring = 3
 country = "nl"
 what = "junior data scientist"
+where = "Netherlands"
 
-[[jobs.adzuna]]
+[[jobs.jsearch.searches]]
 ring = 3
 country = "at"
 what = "junior data scientist"
+where = "Austria"
+language = "de"
 
-[[jobs.adzuna]]
+[[jobs.jsearch.searches]]
 ring = 3
 country = "be"
 what = "junior data scientist"
+where = "Belgium"

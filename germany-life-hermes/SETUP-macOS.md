@@ -98,21 +98,26 @@ The scripts need Python 3.11+. If `./gl` says it can't find one: `brew install p
 Edit or disable any ✗ sources in `config/sources.toml` (`enabled = false`). A few feed URLs
 there couldn't be tested when this was written.
 
-**Optional, Adzuna** (adds Europe-wide jobs): get a free key at developer.adzuna.com, then
+**Optional, JSearch** (adds broader European coverage): create an account at
+[OpenWeb Ninja](https://www.openwebninja.com/api/jsearch) and select the Free plan
+(currently 200 requests/month, a hard limit, no credit card required). In Atlas,
+open **Settings → Sources**, select OpenWeb Ninja, paste the key and save it.
+Then refresh sources. RapidAPI keys are also supported; choose RapidAPI for those.
 
-```bash
-echo 'ADZUNA_APP_ID=your_id'   >> ~/.hermes/.env
-echo 'ADZUNA_APP_KEY=your_key' >> ~/.hermes/.env
-```
+Atlas stores the key in the ignored `state/job_credentials.json` file with owner-only
+permissions. The app and installed Hermes scripts share it through the project
+folder. For a headless installation, set `JSEARCH_API_KEY` and optionally
+`JSEARCH_HOST=openwebninja` or `rapidapi`, and pass those variables through Hermes'
+`terminal.env_passthrough`. A saved Atlas key takes precedence over environment
+variables; Disconnect saves an empty key to disable JSearch.
 
-and allow the scripts to see those two variables in `~/.hermes/config.yaml`:
-
-```yaml
-terminal:
-  env_passthrough:
-    - ADZUNA_APP_ID
-    - ADZUNA_APP_KEY
-```
+Each configured query fetches one page and is cached for 24 hours. Atlas caps its
+JSearch requests (including failures) at 180 per UTC calendar month across the app
+and cron scripts. Existing cached searches remain usable at the cap. The six default
+queries cover Trier, Luxembourg, Germany, the Netherlands, Austria and Belgium;
+edit them in `config/sources.toml`. Country-wide searches do not use a radius.
+The provider receives search terms and places, not your profile or chats.
+Bundesagentur and Arbeitnow continue working without a JSearch key.
 
 ## 7. Create the scheduled jobs
 

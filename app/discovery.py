@@ -92,7 +92,9 @@ def enrich_job(job, translations=None):
                   distance_origin=job.get("distance_origin") or ("Trier" if match and job.get("source") == "Bundesagentur" else ""),
                   source_label="Bundesagentur für Arbeit" if job.get("source") == "Bundesagentur" else job.get("source", "Unknown source"))
     result["distance_from_trier"] = distance if result["distance_origin"].strip().lower() == "trier" else None
-    result["location"] = city_location(result["city"])
+    country = {"DE": "Germany", "LU": "Luxembourg", "NL": "The Netherlands", "AT": "Austria",
+               "BE": "Belgium", "FR": "France", "CH": "Switzerland"}.get(str(job.get("country", "DE")).upper(), job.get("country", "Germany"))
+    result["location"] = city_location(result["city"], country)
     return result
 
 

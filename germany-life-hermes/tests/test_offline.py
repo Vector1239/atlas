@@ -111,7 +111,6 @@ class ProjectCase(unittest.TestCase):
         self._env = os.environ.get("GERMANY_LIFE_HOME")
         os.environ["GERMANY_LIFE_HOME"] = str(self.tmp)
         self._get, self._json = gl.http_get, gl.http_json
-        os.environ.pop("ADZUNA_APP_ID", None)
 
     def tearDown(self):
         gl.http_get, gl.http_json = self._get, self._json

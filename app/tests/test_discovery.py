@@ -32,6 +32,13 @@ class DiscoveryTests(unittest.TestCase):
         self.assertLess(discovery.city_location('Simmern, Hunsrück')['lat'], 50)
         self.assertIsNotNone(discovery.city_location('Eindhoven', 'Netherlands'))
 
+    def test_jsearch_city_pins_follow_provider_country_and_keep_unknown_distance(self):
+        job = {'title': 'Data Scientist', 'where': 'Eindhoven', 'city': 'Eindhoven', 'source': 'JSearch', 'country': 'NL'}
+        row = discovery.enrich_job(job)
+        self.assertIsNotNone(row['location'])
+        self.assertIsNone(row['distance_from_trier'])
+        self.assertIsNone(discovery.enrich_job({**job, 'country': 'DE'})['location'])
+
     def test_headline_translation_survives_known_publisher_suffix_without_merging_different_stories(self):
         title = 'Trier, Eifel, Mosel: Die Events-Tipps fürs Wochenende – Von Dinosauriern bis zu Musik-Highlights'
         original = title + ' - Volksfreund'

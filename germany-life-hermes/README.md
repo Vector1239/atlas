@@ -51,14 +51,14 @@ data/*.{toml,csv} ───┘        │ fetch, filter, dedupe, print
 
 ## Sources
 
-- **Jobs:** Bundesagentur für Arbeit job search (official, free), Arbeitnow (free; has a
-  visa-sponsorship filter), Adzuna (optional free key; covers NL / AT / BE and more)
+- **Jobs:** Bundesagentur für Arbeit job search (free website interface; can change), Arbeitnow (free; has a
+  visa-sponsorship filter), JSearch (optional key; broader European coverage, with daily caching and a monthly request cap)
 - **News:** Google News searches for Trier, Uni Trier, Luxembourg, RLP/Saarland and rules for
   internationals; Tagesschau, DW, 16vor, Volksfreund, r/Trier, Politico Europe
 - **Daily life:** Open-Meteo (weather), OpenMensa (Studierendenwerk Trier menus)
 
-Not included, because they have no public API and their terms forbid scraping: LinkedIn,
-StepStone, Indeed, WG-Gesucht. Their email job alerts are the way to get those.
+Atlas does not scrape LinkedIn, StepStone, Indeed or WG-Gesucht directly. JSearch
+can return listings indexed by Google for Jobs from multiple publishers.
 
 ## Roadmap
 
