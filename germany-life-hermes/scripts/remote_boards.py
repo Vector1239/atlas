@@ -77,7 +77,10 @@ def remoteok(item):
     # An omitted location isn't proof of worldwide eligibility.
     return _job("Remote OK", item["id"], item["position"], item.get("company", ""),
                 item.get("location") or "Location not specified", remote_date(item.get("date") or item.get("epoch")),
-                link, item.get("description", ""), region_name=item.get("location") or "Location not specified")
+                link, item.get("description", ""), region_name=item.get("location") or "Location not specified",
+                tags=[tag for tag in item.get("tags", []) if isinstance(tag, str)],
+                salary={"min": item.get("salary_min"), "max": item.get("salary_max"),
+                        "currency": "USD", "period": "YEAR"})
 
 
 def _job(source, source_id, title, company, scope, posted, url, text, **extra):
@@ -85,7 +88,7 @@ def _job(source, source_id, title, company, scope, posted, url, text, **extra):
     return {"source": source, "source_id": str(source_id), "ring": 2 if GERMANY.search(scope) else 3,
             "title": gl.clean_text(title, 500), "company": gl.clean_text(company, 300),
             "where": f"Remote · {scope or 'location not stated'}", "city": "Remote", "region_name": "", "country": "",
-            "posted": (posted or "")[:10], "url": url, "text": gl.clean_text(text, 4000), "remote": True, "visa": False,
+            "posted": (posted or "")[:10], "url": url, "text": gl.clean_text(text, 30000), "remote": True, "visa": False,
             "remote_scope": scope, **extra}
 
 
@@ -114,7 +117,7 @@ def jobicy(item):
         if isinstance(item.get(name), list) else [gl.clean_text(str(item.get(name)), 60)] if item.get(name) else []
     return _job("Jobicy", item["id"], item["jobTitle"], item.get("companyName", ""), item.get("jobGeo"), item.get("pubDate"),
                 item.get("url", ""), item.get("jobDescription") or item.get("jobExcerpt") or "",
-                salary=salary, job_types=listed("jobType"), tags=listed("jobIndustry"))
+                salary=salary, job_types=listed("jobType"), tags=listed("jobIndustry"), seniority=listed("jobLevel"))
 
 
 def himalayas(item):
@@ -135,13 +138,13 @@ def himalayas(item):
               for p in item.get("locationRestrictions") or [] if isinstance(p, (str, dict))]
     scope = ", ".join(places[:8]) or "Worldwide"
     zones = item.get("timezoneRestrictions") or []
-    zone_note = " · Timezones: " + ", ".join(str(z) for z in zones) if zones else ""
     words = lambda name: [gl.clean_text(v, 60) for v in item.get(name) or [] if isinstance(v, str)][:6]
     return _job("Himalayas", item["guid"], item["title"], item.get("companyName", ""), scope,
                 posted, item["guid"] if safe_link(item["guid"]) else item.get("applicationLink", ""),
                 item.get("description") or item.get("excerpt") or "", salary=salary,
                 job_types=[gl.clean_text(item["employmentType"], 40)] if isinstance(item.get("employmentType"), str) else [],
-                tags=words("categories") + words("parentCategories"), region_name=scope + zone_note)
+                tags=words("categories") + words("parentCategories"), region_name=scope,
+                remote_timezones=zones, seniority=words("seniority"))
 
 
 def fetch_remote(cfg, rings, matcher, status):

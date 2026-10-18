@@ -96,6 +96,24 @@ class DiscoveryTests(unittest.TestCase):
         self.assertFalse(translated['translation_needed'])
         self.assertIn('sustainability', translated['title_en'])
 
+    def test_himalayas_timezone_labels_cover_saved_and_fresh_listings(self):
+        offsets = list(range(-11,15)) + [-9.5,-3.5,3.5,4.5,5.5,5.75,6.5,8.75,9.5,10.5,12.75]
+        job = {'title':'Backend Engineer','source':'Himalayas','remote':True,'city':'Remote',
+               'remote_scope':'Worldwide', 'region_name':'Worldwide · Timezones: ' + ', '.join(map(str,offsets))}
+        old = discovery.enrich_job(job)
+        self.assertEqual(old['region_name'],'Worldwide')
+        self.assertEqual(old['timezone_label'],'All time zones')
+        self.assertIsNone(old['location'])
+        fresh = discovery.enrich_job({**job,'remote_timezones':['UTC+1','UTC+5:30']})
+        self.assertEqual(fresh['timezone_label'],'UTC+01:00, UTC+05:30')
+        germany = discovery.enrich_job({**job,'remote_scope':'Germany','remote_timezones':[1]})
+        self.assertEqual(germany['region_name'],'Germany')
+        self.assertEqual(germany['timezone_label'],'UTC+01:00')
+        restricted = discovery.timezone_summary([-8,-7,-6,-5])
+        self.assertEqual(restricted[0],'4 time zones · see details')
+        self.assertIn('UTC-08:00',restricted[1])
+        self.assertEqual(discovery.timezone_summary([])[0],'All time zones')
+
     def test_ongoing_events_kept_expired_and_cancelled_removed(self):
         base = {'title': 'Test event', 'start': '2026-10-10', 'end': '2026-10-20', 'checked_at': '2026-10-01'}
         catalog = {'checked_at': '2026-10-01', 'calendars': [], 'events': [

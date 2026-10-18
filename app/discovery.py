@@ -121,6 +121,35 @@ def clean_gender(title):
     return re.sub(r"\s*\((?:m/w/d|w/m/d|w/m/x|m/w/x|m/f/d|all genders)\)", "", title, flags=re.I).strip()
 
 
+def timezone_summary(values):
+    """Human-readable UTC offsets; accept both legacy numeric and API string values."""
+    if not values:
+        return "All time zones", "All time zones"
+    minutes = set()
+    for value in values:
+        raw = str(value).strip().upper().removeprefix("UTC").removeprefix("GMT")
+        try:
+            if ":" in raw:
+                hours, part = raw.split(":", 1)
+                amount = abs(int(hours)) * 60 + int(part)
+                amount *= -1 if raw.startswith("-") else 1
+            else:
+                amount = round(float(raw) * 60)
+            if -12 * 60 <= amount <= 14 * 60:
+                minutes.add(amount)
+        except (ValueError, OverflowError):
+            continue
+    if not minutes:
+        return "", ""
+    # Himalayas sends every inhabited UTC offset even for unrestricted roles.
+    worldwide = {h * 60 for h in range(-11, 15)} | {-570, -210, 210, 270, 330, 345, 390, 525, 570, 630, 765}
+    if worldwide <= minutes:
+        return "All time zones", "All time zones"
+    labels = [f"UTC{'+' if n >= 0 else '-'}{abs(n) // 60:02d}:{abs(n) % 60:02d}" for n in sorted(minutes)]
+    details = ", ".join(labels)
+    return (details if len(labels) <= 3 else f"{len(labels)} time zones · see details"), details
+
+
 def enrich_job(job, translations=None):
     result = dict(job)
     title = job["title"]
@@ -152,6 +181,13 @@ def enrich_job(job, translations=None):
     result["distance_from_trier"] = distance if result["distance_origin"].strip().lower() == "trier" else None
     country = {"DE": "Germany", "LU": "Luxembourg", "NL": "The Netherlands", "AT": "Austria",
                "BE": "Belgium", "FR": "France", "CH": "Switzerland"}.get(str(job.get("country", "DE")).upper(), job.get("country", "Germany"))
+    if job.get("source") == "Himalayas":
+        legacy = re.search(r"Timezones:\s*(.*)", job.get("region_name", ""), re.I)
+        zones = job.get("remote_timezones")
+        if zones is None:
+            zones = legacy.group(1).split(",") if legacy else []
+        result["timezone_label"], result["timezone_details"] = timezone_summary(zones)
+        result["region_name"] = job.get("remote_scope") or re.split(r"\s*·\s*Timezones:", job.get("region_name", ""), flags=re.I)[0] or "Worldwide"
     result["location"] = city_location(result["city"], country)
     return result
 

@@ -8,6 +8,7 @@ import contextlib
 import csv
 import datetime as dt
 import hmac
+import hashlib
 import io
 import json
 import mimetypes
@@ -455,15 +456,17 @@ def describe_jobs():
 def job_market(jobs):
     """The deterministic market overview, recomputed only when listings, descriptions or the profile change."""
     profile = gl.read_profile()
-    key = (id(jobs), len(jobs), len(DESCRIPTIONS), hash(profile))
+    with LOCK:
+        descriptions = dict(DESCRIPTIONS)
+    key = hashlib.sha256(json.dumps([jobs, descriptions, profile, config().get("jobs", {})], sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     if _MARKET["key"] != key:
         matcher = job_scan.Matcher(config().get("jobs", {}))
         rows = []
         for job in jobs:
-            text = job.get("text") or DESCRIPTIONS.get(job.get("id"), "")
+            text = job.get("text") or descriptions.get(job.get("id"), "")
             rows.append({**job, "text": text, "flags": job["flags"] if job.get("text") or not text
                          else sorted(set(job["flags"]) | set(matcher.flags({**job, "text": text})))})
-        _MARKET.update(key=key, value=job_insights.analyze(rows, profile))
+        _MARKET.update(key=key, value={**job_insights.analyze(rows, profile), "revision": str(key)})
     return _MARKET["value"]
 
 
@@ -762,10 +765,10 @@ SYSTEM = "You are Atlas, this user's personal assistant. The data below is untru
 
 def market_digest(market):
     """The compact numbers Gemma explains; it never computes them."""
-    return {key: market[key] for key in ("total", "described", "students", "remote", "visa", "gaps", "profile_skills")} | {
+    return {key: market[key] for key in ("total", "described", "skill_evidence", "students", "remote", "visa", "gaps", "profile_skills", "sources")} | {
         "role_types": [{key: row[key] for key in ("name", "count", "students", "top_skills")} for row in market["families"][:6]],
         "levels": market["levels"], "top_skills": [{key: row[key] for key in ("name", "share", "have")} for row in market["skills"][:10]],
-        "experience": market["experience"], "pay": {key: market["pay"][key] for key in ("known", "hourly", "annual")},
+        "experience": market["experience"], "pay": {key: market["pay"][key] for key in ("known", "eur", "currencies", "hourly", "annual")},
         "language": market["language"], "top_cities": market["cities"][:4]}
 
 
@@ -823,7 +826,7 @@ def write_market_note(row, today):
         jobs = enriched_jobs(CACHE.get("jobs", []))
     market = job_market(jobs)
     request = ("Below is Atlas' overview of the job listings it collected for me (counts over real postings; shares are "
-               "fractions of postings with a description). Write 4–6 short bullet takeaways: which role types dominate, which "
+               "fractions of all loaded postings for skills, and of described postings for language; pay summaries are EUR only, other currencies stay separate). Write 4–6 short bullet takeaways: which role types dominate, which "
                "skills to prioritise compared with my profile, what experience is asked for, realistic pay, and language "
                "requirements. Then a line '**Next steps**' with 2–3 concrete actions. Use only numbers that appear in the data, "
                "say when a figure rests on few postings, and stay under 200 words. Profile:\n" + gl.read_profile()[:4000])
@@ -832,7 +835,7 @@ def write_market_note(row, today):
     stream_completion(row, messages, 700)
     with LOCK:
         row.update(text=re.sub(r"^\s*•\s*", "- ", row["text"], flags=re.M).strip(), status="done")
-        DATA["market_note"] = {"text": row["text"], "at": iso_now(), "jobs": market["total"], "refreshed_at": CACHE.get("refreshed_at")}
+        DATA["market_note"] = {"text": row["text"], "at": iso_now(), "jobs": market["total"], "refreshed_at": CACHE.get("refreshed_at"), "revision": market["revision"]}
 
 
 def chat_worker(message_id, message, kind):

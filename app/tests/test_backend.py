@@ -202,8 +202,23 @@ class AtlasTests(unittest.TestCase):
         self.assertEqual((market['total'], market['described']), (3, 2))
         self.assertEqual({row['name']: row['count'] for row in market['skills']}, {'Python': 2, 'SQL': 1, 'Spark': 1})
         self.assertEqual(market['gaps'], ['Spark'])
-        self.assertEqual({row['name']: row['count'] for row in market['experience']['buckets']}, {'0–1 years': 1, '2–3 years': 1, '4–5 years': 0, '6+ years': 0})
+        self.assertEqual({row['name']: row['count'] for row in market['experience']['buckets']}, {'0–1 years': 0, '2–3 years': 1, '4–5 years': 0, '6+ years': 0})
         self.assertEqual((market['pay']['hourly']['median'], market['pay']['annual']['median']), (15.5, 60000))
+
+    def test_market_cache_updates_when_description_contents_change_without_count_change(self):
+        b = self.backend
+        jobs = [{'id':'cache-test','title':'Engineer','flags':[], 'text':''}]
+        with patch.dict(b.DESCRIPTIONS,{'cache-test':'Python'},clear=True), patch.dict(b._MARKET,{'key':None,'value':None}), \
+                patch.object(b.gl,'read_profile',return_value=''), patch.object(b,'config',return_value={'jobs':{}}):
+            first = b.job_market(jobs)
+            b.DESCRIPTIONS['cache-test'] = 'SQL'
+            second = b.job_market(jobs)
+            self.assertEqual([r['name'] for r in first['skills']],['Python'])
+            self.assertEqual([r['name'] for r in second['skills']],['SQL'])
+            self.assertNotEqual(first['revision'],second['revision'])
+            jobs[0]['skills'] = ['Docker']
+            third = b.job_market(jobs)
+            self.assertIn('Docker & Kubernetes',[r['name'] for r in third['skills']])
 
     def test_article_images_require_auth_and_only_serve_the_owned_cache(self):
         path = '/api/news/images/' + 'a' * 64

@@ -48,7 +48,8 @@ class RemoteJobsTests(unittest.TestCase):
             self.assertTrue(job['url'].startswith('https://'))
         job = providers.himalayas(self.himalayas)
         self.assertIn('Germany, France',job['where'])
-        self.assertIn('Timezones: 1, 2',job['region_name'])
+        self.assertEqual(job['remote_timezones'],[1,2])
+        self.assertNotIn('Timezones:',job['region_name'])
         self.assertEqual(job['text'],'Build data tools')
         self.assertEqual(providers.remote_date(self.today.timestamp()*1000)[:10],self.today.date().isoformat())
 

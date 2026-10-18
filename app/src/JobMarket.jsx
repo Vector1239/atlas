@@ -10,6 +10,11 @@ const yearly = value => `€${Math.round(value / 1000)}K`;
 const share = (part, whole) => whole ? pct(part / whole) : '—';
 const running = run => run && !['done', 'error', 'cancelled'].includes(run.status);
 
+function payAmount(row) {
+  const format = value => new Intl.NumberFormat('en-GB', { style:'currency', currency:row.currency, maximumFractionDigits:row.period === 'hour' ? 2 : 0 }).format(value);
+  return `${format(row.low)}${row.high !== row.low ? `–${format(row.high)}` : ''} / ${row.period}`;
+}
+
 function Tile({ label, value, note }) { return <div className="market-tile"><span>{label}</span><strong>{value}</strong><small>{note}</small></div>; }
 
 function payTile(spread, format, missing) {
@@ -37,11 +42,11 @@ function BarCard({ title, label, note, rows, columns, children }) {
 
 function Takeaways({ data, act }) {
   const run = data.tasks?.market, note = data.market_note, jobs = data.job_market.total;
-  const stale = note && note.refreshed_at !== data.refreshed_at;
+  const stale = note && (note.refreshed_at !== data.refreshed_at || note.revision !== data.job_market.revision);
   return <section className="card market-takeaways">
     <div className="card-heading"><div><div className="eyebrow">WITH ATLAS</div><h2>What this means for you</h2></div><SparkleIcon size={19} weight="bold" aria-hidden="true" /></div>
     {running(run) ? (run.text ? <Markdown>{run.text}</Markdown> : <div className="thinking"><span className="dot pulse" />{run.status === 'loading' ? 'Getting Gemma ready…' : 'Reading the numbers…'}</div>)
-      : note ? <><Markdown>{note.text}</Markdown>{stale && <p className="form-help">Your listings changed since this was written.</p>}</>
+      : note ? <><Markdown>{note.text}</Markdown>{stale && <p className="form-help">Your market data changed since this was written. Explain again to use the current figures.</p>}</>
       : <p className="market-note">Gemma reads the numbers on this page alongside your profile and suggests what to focus on. It runs on this Mac through Hermes and never changes the counts.</p>}
     {run?.status === 'error' && <p className="form-error">{run.text}</p>}
     <div className="card-footer"><span>{note ? `Written ${niceDate(note.at, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} from ${note.jobs} roles` : 'Written by local Gemma'}</span><button className="text-button" disabled={data.busy || !jobs} onClick={() => act('/api/market/note', {})}>{note ? 'Explain again' : 'Explain with Gemma'}<ArrowClockwiseIcon size={14} /></button></div>
@@ -51,33 +56,34 @@ function Takeaways({ data, act }) {
 export default function JobMarket({ data, act, navigate }) {
   const market = data.job_market, described = market.described;
   if (!market.total) return <><div className="page-heading"><div><div className="eyebrow">WHAT THE LISTINGS SAY</div><h1>Your job market.</h1></div></div><div className="empty"><h3>No listings yet.</h3><p>{data.refresh.running ? 'Your job sources are being checked.' : 'Refresh your sources to see which roles, skills and pay are out there.'}</p></div></>;
-  const student = payTile(market.pay.hourly, hourly, 'No posting lists an hourly rate yet'), salary = payTile(market.pay.annual, yearly, 'No posting lists a salary yet');
+  const hourPay = payTile(market.pay.hourly, hourly, 'No EUR hourly rate is available'), salary = payTile(market.pay.annual, yearly, 'No EUR annual salary is available');
   const experience = market.experience;
   return <>
     <div className="page-heading"><div><div className="eyebrow">WHAT THE LISTINGS SAY</div><h1>Your job market.</h1><p>Every figure is counted from the {market.total} roles Atlas found, from {data.home.city} outwards; nothing here is estimated by AI.</p></div><button className="button secondary" disabled={data.refresh.running} onClick={() => act('/api/refresh', {})}><ArrowClockwiseIcon size={15} />{data.refresh.running ? 'Refreshing…' : 'Refresh'}</button></div>
     {market.reading?.running && <div className="refresh-status"><span className="dot pulse" />Reading Bundesagentur job descriptions… {market.reading.fetched} checked</div>}
     <div className="market-tiles">
       <Tile label="Roles found" value={market.total.toLocaleString('en-GB')} note={`${market.students} student roles · ${described} with a description`} />
-      <Tile label="Student pay per hour" value={student.value} note={student.note} />
-      <Tile label="Full-time salary per year" value={salary.value} note={salary.note} />
+      <Tile label="Hourly pay · EUR" value={hourPay.value} note={hourPay.note} />
+      <Tile label="Annual pay · EUR" value={salary.value} note={salary.note} />
       <Tile label="German required" value={share(market.language.german_required, described)} note={`${market.language.german_required} of ${described} described postings`} />
     </div>
+    <p className="market-note">Loaded sources: {market.sources.map(row => `${row.name} ${row.count}`).join(' · ')}. Each skill is counted once per posting.</p>
     <div className="market-grid">
       <Takeaways data={data} act={act} />
       <BarCard title="Types of roles" label="BY JOB TITLE" note="Grouped from each title; hover a bar for the skills that group asks for most."
         rows={market.families.map(row => ({ ...row, value: row.count, display: String(row.count), tip: `${row.count} roles, ${row.students} for students${row.top_skills.length ? `. Often asks for ${row.top_skills.join(', ')}` : ''}.` }))}
         columns={[['Role type', row => row.name], ['Roles', row => row.count], ['Student roles', row => row.students], ['Common skills', row => row.top_skills.join(', ') || '—'], ['Examples', row => row.jobs.map(job => job.title_en || job.title).join(' · ')]]} />
     </div>
-    <BarCard title="Skills employers ask for" label="FROM THE DESCRIPTIONS" note={`Share of the ${described} postings with a description that mention each skill.${market.profile_skills.length ? '' : ' Add your skills to your profile in Settings to see which ones you already cover.'}`}
-      rows={market.skills.map(row => ({ ...row, value: row.share, display: pct(row.share), mark: row.have ? 'On your profile' : '', tip: `${row.count} of ${described} postings mention ${row.name}.` }))}
+    <BarCard title="Skills mentioned in postings" label="TITLES, DESCRIPTIONS & PROVIDER FIELDS" note={`Share of all ${market.total} roles mentioning each skill; ${market.skill_evidence} have a description or skill evidence. Missing mentions are unknown requirements.${market.profile_skills.length ? '' : ' Add your skills to your profile in Settings to see which ones you already cover.'}`}
+      rows={market.skills.map(row => ({ ...row, value: row.share, display: pct(row.share), mark: row.have ? 'On your profile' : '', tip: `${row.count} of ${market.total} postings mention ${row.name}.` }))}
       columns={[['Skill', row => row.name], ['Postings', row => row.count], ['Share', row => pct(row.share)], ['On your profile', row => row.have ? 'Yes' : 'No']]}>
       {market.gaps.length > 0 && <p className="market-gaps"><strong>Worth adding next:</strong> {market.gaps.join(', ')}. Each appears in at least one in ten postings, and your profile doesn’t mention it yet.</p>}
     </BarCard>
     <div className="market-grid three">
-      <BarCard title="Experience asked for" label="YEARS" note={experience.known ? `${experience.known} postings say how much experience they want${experience.median !== null ? `; the median is ${experience.median} years` : ''}.` : 'No posting states the years of experience yet.'}
+      <BarCard title="Experience asked for" label="YEARS" note={experience.known ? `${experience.known} postings say how much experience they want${experience.median !== null ? `; the median is ${experience.median} years` : ''}. ${experience.unknown} do not give a numeric requirement; ${experience.unspecified_years} say several years without a number.` : `${experience.unknown} postings give no numeric experience requirement; ${experience.unspecified_years} say several years without a number.`}
         rows={experience.known ? experience.buckets.map(row => ({ ...row, value: row.count, display: String(row.count), tip: `${row.count} postings ask for ${row.name} of experience.` })) : []}
         columns={[['Experience', row => row.name], ['Postings', row => row.count]]} />
-      <BarCard title="Seniority" label="FROM TITLES & REQUIREMENTS"
+      <BarCard title="Seniority" label="TITLES & PROVIDER LEVELS" note="Unspecified levels stay in Not stated; they are not assumed to be professional roles."
         rows={market.levels.map(row => ({ ...row, value: row.count, display: String(row.count), tip: `${row.count} of ${market.total} roles (${share(row.count, market.total)}).` }))}
         columns={[['Level', row => row.name], ['Roles', row => row.count], ['Share', row => share(row.count, market.total)]]} />
       <BarCard title="Where the roles are" label="TOP CITIES"
@@ -86,9 +92,9 @@ export default function JobMarket({ data, act, navigate }) {
     </div>
     <div className="market-grid">
       <section className="card"><div className="card-heading"><div><div className="eyebrow">WHAT POSTINGS SAY</div><h2>Pay in the listings</h2></div></div>
-        {market.pay.examples.length ? <div className="table-wrap"><table><thead><tr><th>Role</th><th>Company</th><th>Pay</th></tr></thead><tbody>{market.pay.examples.map(row => <tr key={row.id}><td>{row.title}</td><td>{row.company}</td><td>{row.period === 'hour' ? `${hourly(row.low)}${row.high !== row.low ? `–${hourly(row.high)}` : ''} / hour` : `${yearly(row.low)}${row.high !== row.low ? `–${yearly(row.high)}` : ''} / year`}</td></tr>)}</tbody></table></div>
-          : <p className="muted">None of the descriptions state pay yet. German postings often leave it out; Werkstudent roles usually pay by the hour.</p>}
-        <p className="form-help">{market.pay.known} of {market.total} roles state pay. Monthly figures are shown ×12. Check the listing before relying on a number.</p>
+        {market.pay.examples.length ? <div className="table-wrap"><table><thead><tr><th>Role</th><th>Company</th><th>Pay</th></tr></thead><tbody>{market.pay.examples.map(row => <tr key={row.id}><td>{row.title}</td><td>{row.company}</td><td>{payAmount(row)}</td></tr>)}</tbody></table></div>
+          : <p className="muted">No usable pay amount with a currency and period is available yet. German postings often leave it out; Werkstudent roles usually pay by the hour.</p>}
+        <p className="form-help">{market.pay.known} of {market.total} roles have usable pay data: {market.pay.currencies.map(row => `${row.name} ${row.count}`).join(', ') || 'none'}. The headline medians use the {market.pay.eur} EUR postings only; currencies are never mixed. Monthly figures are shown ×12. Medians use the midpoint of each posting’s range. Check the listing before relying on a number.</p>
       </section>
       <section className="card"><div className="card-heading"><div><div className="eyebrow">LANGUAGE & FLEXIBILITY</div><h2>What the roles expect</h2></div></div>
         <dl className="market-facts">
@@ -98,6 +104,7 @@ export default function JobMarket({ data, act, navigate }) {
           <div><dt>Remote or hybrid{market.remote > 0 && <button className="text-button" onClick={() => navigate('remote')}>See remote roles</button>}</dt><dd>{share(market.remote, market.total)}<small>{market.remote} of {market.total} roles</small></dd></div>
           <div><dt>Visa sponsorship listed</dt><dd>{share(market.visa, market.total)}<small>{market.visa} of {market.total} roles</small></dd></div>
         </dl>
+        <p className="form-help">Language counts cover described postings only. A missing German requirement does not confirm that English alone is sufficient.</p>
         {market.companies.length > 0 && <><h3 className="market-subhead">Hiring more than once</h3><div className="tags">{market.companies.map(row => <span className="badge" key={row.name}>{row.name} · {row.count}</span>)}</div></>}
       </section>
     </div>

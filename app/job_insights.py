@@ -6,6 +6,7 @@ fields. Every number is a count over real postings, so Gemma can explain it but 
 from __future__ import annotations
 
 import collections
+import math
 import re
 import statistics
 
@@ -58,8 +59,8 @@ EXPERIENCE = [
     re.compile(r"(?:experience|erfahrung)\b[^.;\n]{0,30}?(?:mindestens|at least|min\.|von)?\s*\b" + _N + r"\s*\+?\s*(?:years?|jahre?n?)\b", re.I),
 ]
 SEVERAL_YEARS = re.compile(r"mehrjährige|mehreren jahren|several years|multiple years|many years|langjährige|extensive experience", re.I)
-NO_EXPERIENCE = re.compile(r"berufseinsteiger|keine berufserfahrung|no (?:prior |previous )?experience (?:is )?(?:required|needed)|"
-                           r"erste (?:praktische |berufliche )?(?:berufs)?erfahrung|first (?:practical |professional )?experience", re.I)
+NO_EXPERIENCE = re.compile(r"keine berufserfahrung|no (?:prior |previous )?experience (?:is )?(?:required|needed)|"
+                           r"zero years? of experience", re.I)
 
 _AMOUNT = r"\d{1,3}(?:[.,  ]\d{3})+(?:,\d{2})?|\d+(?:[.,]\d{1,2})?"
 _CURRENCY = r"(?:€|eur\b|euro\b)"
@@ -75,6 +76,13 @@ LIMITS = {"hour": (8, 150), "month": (500, 20000), "year": (10000, 300000)}
 
 
 def family(job):
+    title = f"{job.get('title', '')} {job.get('title_en') or ''}"
+    # Explicit role names take priority over technologies mentioned in a title.
+    for name, pattern in (("Mobile", r"mobile|\bios\b|android|flutter|react native"),
+                          ("Backend, cloud & DevOps", r"back.?end|devops|site reliability|\bsre\b"),
+                          ("Software engineering", r"\bqa\b|quality assurance")):
+        if re.search(pattern, title, re.I):
+            return name
     for text in (job.get("title_en") or "", job.get("title") or "", job.get("occupation") or ""):
         for name, rule in FAMILY_RULES:
             if text and rule.search(text):
@@ -103,7 +111,7 @@ def _years(value):
 def experience_years(job, text):
     """The minimum years a posting asks for, or None when it doesn't say."""
     months = job.get("experience_months")
-    if isinstance(months, (int, float)) and months > 0:
+    if isinstance(months, (int, float)) and math.isfinite(months) and 0 <= months <= 600:
         return round(months / 12, 1)
     found = [_years(match.group(1)) for rule in EXPERIENCE for match in rule.finditer(text)]
     found = [value for value in found if value is not None and 0 < value <= 15]
@@ -111,8 +119,6 @@ def experience_years(job, text):
         return min(found)
     if NO_EXPERIENCE.search(text):
         return 0
-    if SEVERAL_YEARS.search(text):
-        return 3
     return None
 
 
@@ -128,13 +134,17 @@ def _number(value, unit):
 
 
 def pay(job, text):
-    """{"period": "hour"|"year", "low", "high"} from the provider's fields or the description; monthly × 12."""
+    """{"period": "hour"|"year", "currency", "low", "high"} from the provider's fields or the description; monthly × 12."""
     salary = job.get("salary") or {}
-    if salary and (salary.get("currency") or "EUR").upper() == "EUR":
-        period = {"HOUR": "hour", "MONTH": "month", "YEAR": "year"}.get((salary.get("period") or "").upper())
-        values = [v for v in (salary.get("min"), salary.get("max")) if isinstance(v, (int, float)) and v > 0]
-        if period and values:
-            return _period_result(period, min(values), max(values))
+    if isinstance(salary, dict) and salary:
+        currency = str(salary.get("currency") or "").upper()
+        period = {"HOUR": "hour", "HOURLY": "hour", "MONTH": "month", "MONTHLY": "month", "YEAR": "year", "YEARLY": "year", "ANNUAL": "year"}.get(str(salary.get("period") or "").upper())
+        values = [v for v in (salary.get("min"), salary.get("max")) if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and v > 0]
+        if period and values and re.fullmatch(r"[A-Z]{3}", currency):
+            low, high = min(values), max(values)
+            if period == "month":
+                period, low, high = "year", low * 12, high * 12
+            return {"period": period, "currency": currency, "low": round(low, 2), "high": round(high, 2)}
     for match in MONEY.finditer(text):
         if not re.search(_CURRENCY, match.group(0), re.I):
             continue
@@ -150,8 +160,8 @@ def pay(job, text):
         after = text[match.end():match.end() + 30]
         stated = [period for words in (after, context) for period, rule in (("hour", HOURLY), ("month", MONTHLY), ("year", YEARLY))
                   if rule.search(words)]
-        # A stated period wins; otherwise (or if it doesn't fit the amount) the size of the amount decides.
-        for period in stated[:1] + ["hour" if low <= 150 else "month" if low <= 12000 else "year"]:
+        # Respect a stated period; use amount heuristics only when no period is given.
+        for period in stated[:1] or ["hour" if low <= 150 else "month" if low <= 12000 else "year"]:
             result = _period_result(period, min(low, high), max(low, high))
             if result:
                 return result
@@ -164,7 +174,7 @@ def _period_result(period, low, high):
         return None
     if period == "month":
         period, low, high = "year", low * 12, high * 12
-    return {"period": period, "low": round(low, 2), "high": round(high, 2)}
+    return {"period": period, "currency": "EUR", "low": round(low, 2), "high": round(high, 2)}
 
 
 def _spread(values):
@@ -179,26 +189,45 @@ def _top(counter, limit):
     return [{"name": name, "count": count} for name, count in counter.most_common(limit)]
 
 
+def seniority(job, years):
+    flags = set(job.get("flags") or [])
+    title = f"{job.get('title', '')} {job.get('title_en') or ''}"
+    supplied = job.get("seniority") or []
+    supplied = supplied if isinstance(supplied, list) else [supplied]
+    types = job.get("job_types") or []
+    types = types if isinstance(types, list) else [types]
+    level = " ".join(str(value) for value in supplied)
+    if "student-job" in flags or re.search(r"werkstudent|working student|\bintern(?:ship)?\b|studentische|hilfskraft|\bhiwi\b", title + " " + " ".join(types), re.I):
+        return "Student & intern"
+    if "senior" in flags or re.search(r"\bsr\.?\b|senior|\blead\b|principal|head of|director|\bstaff\b|executive|leiter", title + " " + level, re.I):
+        return "Senior & lead"
+    if re.search(r"\bmanager\b", level, re.I):
+        return "Senior & lead"
+    if LEVEL_ENTRY.search(title + " " + level) or years is not None and years < 2:
+        return "Entry & junior"
+    if re.search(r"mid.?level|intermediate|professional", level, re.I) or years is not None and years >= 2:
+        return "Professional"
+    return "Not stated"
+
+
 def analyze(jobs, profile=""):
     """jobs: enriched listings, each with the best description Atlas has as `text`."""
     rows = []
     for job in jobs:
         text = " ".join(filter(None, [job.get("title", ""), job.get("title_en") or "", " ".join(job.get("tags") or []),
                                       " ".join(job.get("skills") or []), job.get("text", "")]))
-        level = ("Student & intern" if "student-job" in job.get("flags", []) else "Senior & lead" if "senior" in job.get("flags", [])
-                 else None)
         years = experience_years(job, job.get("text", ""))
-        if level is None:
-            level = "Entry & junior" if LEVEL_ENTRY.search(f"{job.get('title', '')} {job.get('title_en') or ''}") or years == 0 else "Professional"
+        level = seniority(job, years)
         rows.append({"job": job, "family": family(job), "skills": skills(text), "years": years, "level": level,
-                     "pay": pay(job, job.get("text", "")), "described": bool(job.get("text"))})
+                     "pay": pay(job, job.get("text", "")), "described": bool((job.get("text") or "").strip()), "skill_evidence": bool((job.get("text") or "").strip() or job.get("tags") or job.get("skills") or skills(text))})
     described = [row for row in rows if row["described"]]
+    evidence = [row for row in rows if row["skill_evidence"]]
     have = set(profile_skills(profile))
-    skill_counts = collections.Counter(name for row in described for name in row["skills"])
+    skill_counts = collections.Counter(name for row in evidence for name in row["skills"])
     families = []
     for name, count in collections.Counter(row["family"] for row in rows).most_common():
         members = [row for row in rows if row["family"] == name]
-        inner = collections.Counter(skill for row in members if row["described"] for skill in row["skills"])
+        inner = collections.Counter(skill for row in members if row["skill_evidence"] for skill in row["skills"])
         families.append({"name": name, "count": count, "students": sum(row["level"] == "Student & intern" for row in members),
                          "top_skills": [skill for skill, _ in inner.most_common(3)],
                          "jobs": [{key: row["job"].get(key) for key in ("id", "title_en", "title", "company", "city")} for row in members[:4]]})
@@ -207,22 +236,25 @@ def analyze(jobs, profile=""):
         if row["years"] is not None:
             buckets["0–1 years" if row["years"] < 2 else "2–3 years" if row["years"] < 4 else "4–5 years" if row["years"] < 6 else "6+ years"] += 1
     paid = [row for row in rows if row["pay"]]
-    hourly = [(row["pay"]["low"] + row["pay"]["high"]) / 2 for row in paid if row["pay"]["period"] == "hour"]
-    yearly = [(row["pay"]["low"] + row["pay"]["high"]) / 2 for row in paid if row["pay"]["period"] == "year"]
+    hourly = [(row["pay"]["low"] + row["pay"]["high"]) / 2 for row in paid if row["pay"]["period"] == "hour" and row["pay"]["currency"] == "EUR"]
+    yearly = [(row["pay"]["low"] + row["pay"]["high"]) / 2 for row in paid if row["pay"]["period"] == "year" and row["pay"]["currency"] == "EUR"]
     flags = lambda name: sum(name in row["job"].get("flags", []) for row in described)
-    in_demand = [{"name": name, "count": count, "share": round(count / len(described), 3), "have": name in have}
+    in_demand = [{"name": name, "count": count, "share": round(count / len(rows), 3), "have": name in have}
                  for name, count in skill_counts.most_common(14)]
     return {
-        "total": len(rows), "described": len(described),
+        "total": len(rows), "described": len(described), "skill_evidence": len(evidence),
+        "sources": _top(collections.Counter(row["job"].get("source") or "Unknown source" for row in rows), len(rows)),
         "students": sum(row["level"] == "Student & intern" for row in rows),
         "families": families,
         "levels": [{"name": name, "count": sum(row["level"] == name for row in rows)}
-                   for name in ("Student & intern", "Entry & junior", "Professional", "Senior & lead")],
+                   for name in ("Student & intern", "Entry & junior", "Professional", "Senior & lead", "Not stated")],
         "skills": in_demand,
-        "experience": {"known": sum(buckets.values()), "median": statistics.median([row["years"] for row in rows if row["years"] is not None])
+        "experience": {"known": sum(buckets.values()), "unknown": len(rows) - sum(buckets.values()),
+                       "unspecified_years": sum(row["years"] is None and bool(SEVERAL_YEARS.search(row["job"].get("text") or "")) for row in rows), "median": statistics.median([row["years"] for row in rows if row["years"] is not None])
                        if buckets else None,
                        "buckets": [{"name": name, "count": buckets[name]} for name in ("0–1 years", "2–3 years", "4–5 years", "6+ years")]},
-        "pay": {"known": len(paid), "hourly": _spread(hourly), "annual": _spread(yearly),
+        "pay": {"known": len(paid), "eur": len(hourly) + len(yearly),
+                "currencies": _top(collections.Counter(row["pay"]["currency"] for row in paid), len(paid)), "hourly": _spread(hourly), "annual": _spread(yearly),
                 "examples": [{"id": row["job"].get("id"), "title": row["job"].get("title_en") or row["job"].get("title"),
                               "company": row["job"].get("company"), **row["pay"]} for row in paid[:12]]},
         "language": {"described": len(described), "german_required": flags("german-required"),
