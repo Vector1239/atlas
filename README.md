@@ -15,7 +15,7 @@ Atlas brings your existing Germany-life project and Hermes Agent into one local 
 - **Ask Atlas:** one continuing Hermes conversation with local Gemma, web search/extraction, memory and the Germany-life skills. Hermes keeps the conversation itself; **New conversation** starts a fresh one. Searches contact external search providers/sites; model inference stays local. Commands that need approval are declined automatically.
 - **Settings:** edit your profile, change reasoning effort, start or stop Hermes and Gemma, manage routines, check sources, and install app updates.
 
-The version (currently 1.12.9) is shown at the bottom of the sidebar and under **Atlas → About Atlas**. It is set in `app/package.json`; bump it there when you change the app.
+The version (currently 1.12.10) is shown at the bottom of the sidebar and under **Atlas → About Atlas**. It is set in `app/package.json`; bump it there when you change the app.
 
 ## Development and delivery
 

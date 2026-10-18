@@ -28,6 +28,12 @@ EUROPE = [("Amsterdam", 52.370, 4.895), ("Brussels", 50.850, 4.352), ("Vienna", 
           ("Madrid", 40.417, -3.704), ("Barcelona", 41.385, 2.173), ("Dublin", 53.350, -6.260), ("London", 51.507, -0.128),
           ("Stockholm", 59.329, 18.069), ("Oslo", 59.914, 10.752)]
 CATEGORIES = {"Music": "Music", "Arts & Theatre": "Culture", "Sports": "Sports", "Film": "Film", "Family": "Family"}
+# Bump when the event shape changes so the next refresh replaces older cached rows.
+SCHEMA = 2
+TEAM_SPORTS = {"Football", "Soccer", "Basketball", "Hockey", "Ice Hockey", "Handball", "Volleyball", "Rugby", "Baseball", "American Football"}
+STAGE = {"Theatre": "theatre show", "Comedy": "comedy show", "Musical": "musical", "Opera": "opera", "Dance": "dance performance",
+         "Classical": "classical performance", "Magic & Illusion": "magic show", "Circus & Specialty Acts": "circus show",
+         "Children's Theatre": "children's theatre show", "Spectacular": "show", "Cultural": "cultural event"}
 SYMBOLS = {"EUR": "€", "GBP": "£", "USD": "$", "CHF": "CHF ", "DKK": "DKK ", "SEK": "SEK ", "NOK": "NOK ", "PLN": "PLN ", "CZK": "CZK "}
 
 
@@ -77,6 +83,34 @@ def distance_km(lat1, lon1, lat2, lon2):
     return 6371 * 2 * math.atan2(math.sqrt(a), math.sqrt(max(0.0, 1 - a)))
 
 
+def _named(value):
+    name = gl.clean_text((value or {}).get("name", ""), 60)
+    return "" if name.casefold() in ("undefined", "other", "miscellaneous", "") else name
+
+
+def summary(segment, genre, subgenre, lineup, venue, city):
+    """A one-line "what is this" from Ticketmaster's classification and line-up, e.g. "Rock concert with Muse at Arena, Berlin"."""
+    place = " at " + ", ".join(p for p in (venue, city) if p) if venue or city else ""
+    if segment == "Music":
+        style = genre or subgenre
+        what = f"{style} concert" if style else "Concert"
+        acts = lineup[:3]
+        return what + (" with " + ", ".join(acts[:-1]) + " and " + acts[-1] if len(acts) > 1 else f" with {acts[0]}" if acts else "") + place
+    if segment == "Sports":
+        sport = genre or subgenre
+        if sport in TEAM_SPORTS and len(lineup) >= 2:
+            return f"{sport} match: {lineup[0]} vs {lineup[1]}{place}"
+        return (f"{sport} event" if sport else "Sports event") + (f" with {lineup[0]}" if lineup else "") + place
+    if segment == "Arts & Theatre":
+        what = STAGE.get(genre) or (f"{genre} show" if genre else "Stage show")
+        return what[0].upper() + what[1:] + (f" with {lineup[0]}" if lineup else "") + place
+    if segment == "Film":
+        return (f"{genre} film screening" if genre else "Film screening") + place
+    if segment == "Family" or genre == "Family":
+        return "Family event" + (f" with {lineup[0]}" if lineup else "") + place
+    return ("Event with " + lineup[0] if lineup else (genre + " event" if genre else "Event")) + place
+
+
 def normalize(item, home, today):
     """One Ticketmaster event in Atlas' event shape, or None when it has no firm date or was cancelled."""
     if not isinstance(item, dict) or not item.get("name") or not str(item.get("url", "")).startswith("https://"):
@@ -109,21 +143,26 @@ def normalize(item, home, today):
         pass
     kind = ((item.get("classifications") or [{}])[0] or {})
     segment = (kind.get("segment") or {}).get("name", "")
-    genre = (kind.get("genre") or {}).get("name", "")
+    genre, subgenre = _named(kind.get("genre")), _named(kind.get("subGenre"))
+    subgenre = "" if subgenre == genre else subgenre
+    lineup = [name for name in (_named(a) for a in ((item.get("_embedded") or {}).get("attractions") or [])[:4] if isinstance(a, dict)) if name]
     prices = [p for p in item.get("priceRanges") or [] if isinstance(p, dict) and isinstance(p.get("min"), (int, float))]
     price = "Tickets on Ticketmaster"
     if prices:
         symbol = SYMBOLS.get(str(prices[0].get("currency") or "").upper(), "")
         low, high = prices[0]["min"], prices[0].get("max") or prices[0]["min"]
         price = f"{symbol}{low:.0f}" + (f"–{symbol}{high:.0f}" if high > low else "")
-    notes = [n for n in (genre if genre and genre != "Undefined" else "", gl.clean_text(item.get("info") or "", 240)) if n]
+    about = gl.clean_text(item.get("description") or item.get("info") or "", 600)
+    note = gl.clean_text(item.get("pleaseNote") or "", 400)
     when = (start.get("localTime") or "")[:5]
     return {"id": "tm-" + str(item.get("id") or hashlib.sha256(item["url"].encode()).hexdigest()[:16]), "title": gl.clean_text(item["name"], 200),
             "start": start["localDate"], "end": end, "time_note": (f"{when} · local time" if when else "Time on the listing")
             + (" · postponed" if state == "postponed" else " · rescheduled" if state == "rescheduled" else ""),
-            "city": city, "country": country, "venue": gl.clean_text(venue.get("name", ""), 120),
+            "city": city, "country": country, "country_code": code, "venue": gl.clean_text(venue.get("name", ""), 120),
             "area": "Trier" if distance is not None and distance <= 40 else "Germany" if code == "DE" else "Europe",
-            "category": CATEGORIES.get(segment, "Other"), "price": price, "description": " · ".join(notes),
+            "category": CATEGORIES.get(segment, "Other"), "genre": genre, "subgenre": subgenre, "lineup": lineup, "price": price,
+            "description": summary(segment, genre, subgenre, lineup, gl.clean_text(venue.get("name", ""), 120), city) + ".",
+            "about": "" if about == note else about, "note": note,
             "source": "Ticketmaster", "url": item["url"], "checked_at": today.isoformat(), "location": location}
 
 
@@ -139,7 +178,7 @@ def refresh(state_dir, home, today, fetch=None, pause=0.6, force=False):
     """Sweep the searches when the 12-hour cache is due; returns the cache. Failures keep the previous events."""
     key = credentials(state_dir)
     cache = cached(state_dir)
-    if not key or (not force and time.time() - cache.get("at", 0) < CACHE_SECONDS):
+    if not key or (not force and cache.get("schema") == SCHEMA and time.time() - cache.get("at", 0) < CACHE_SECONDS):
         return cache
     fetch = fetch or gl.http_json
     window = {"startDateTime": f"{today:%Y-%m-%d}T00:00:00Z",
@@ -163,9 +202,9 @@ def refresh(state_dir, home, today, fetch=None, pause=0.6, force=False):
                 found.append(row)
         time.sleep(pause)
     if not found and errors:
-        cache.update(error="; ".join(errors[:2]), at=time.time())  # don't hammer a rejected key; retry after 12 hours
+        cache.update(error="; ".join(errors[:2]), at=time.time(), schema=SCHEMA)  # don't hammer a rejected key; retry after 12 hours
     else:
-        cache = {"at": time.time(), "fetched_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+        cache = {"at": time.time(), "schema": SCHEMA, "fetched_at": dt.datetime.now(dt.timezone.utc).isoformat(),
                  "events": sorted(found, key=lambda row: row["start"]), "error": "; ".join(errors[:2])}
     gl.save_json(state_dir / "live_events.json", cache)
     return cache

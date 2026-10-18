@@ -207,6 +207,42 @@ class AtlasTests(unittest.TestCase):
             merged = self.backend.discovery.upcoming_events(today, cache['events'])['items']
             self.assertIn('Concert in Trier', [row['title'] for row in merged])
 
+    def test_ticketmaster_events_say_what_they_are_from_classification_lineup_and_notes(self):
+        events = self.backend.event_sources
+        today = self.backend.dt.date.today()
+        base = {'url': 'https://www.ticketmaster.de/event/x', 'dates': {'start': {'localDate': today.isoformat()}},
+                '_embedded': {'venues': [{'name': 'Uber Arena', 'city': {'name': 'Berlin'}, 'country': {'name': 'Germany', 'countryCode': 'DE'}}]}}
+        home = {'lat': 49.75, 'lon': 6.64}
+        def row(**fields):
+            item = {**base, 'name': 'Show', **fields}
+            item['_embedded'] = {**base['_embedded'], **fields.get('_embedded', {})}
+            return events.normalize(item, home, today)
+        acts = lambda *names: {'attractions': [{'name': n} for n in names]}
+        concert = row(classifications=[{'segment': {'name': 'Music'}, 'genre': {'name': 'Rock'}, 'subGenre': {'name': 'Alternative Rock'}}],
+                      _embedded=acts('Muse', 'Nova Twins'), info='Doors open at 18:00.', pleaseNote='No bags larger than A4.')
+        self.assertEqual(concert['description'], 'Rock concert with Muse and Nova Twins at Uber Arena, Berlin.')
+        self.assertEqual((concert['genre'], concert['subgenre'], concert['lineup'], concert['country_code']), ('Rock', 'Alternative Rock', ['Muse', 'Nova Twins'], 'DE'))
+        self.assertEqual((concert['about'], concert['note']), ('Doors open at 18:00.', 'No bags larger than A4.'))
+        match = row(classifications=[{'segment': {'name': 'Sports'}, 'genre': {'name': 'Soccer'}}], _embedded=acts('Hertha BSC', 'FC Schalke 04'))
+        self.assertEqual(match['description'], 'Soccer match: Hertha BSC vs FC Schalke 04 at Uber Arena, Berlin.')
+        musical = row(classifications=[{'segment': {'name': 'Arts & Theatre'}, 'genre': {'name': 'Musical'}}])
+        self.assertEqual(musical['description'], 'Musical at Uber Arena, Berlin.')
+        unknown = row(classifications=[{'segment': {'name': 'Undefined'}, 'genre': {'name': 'Undefined'}}])
+        self.assertEqual((unknown['description'], unknown['genre'], unknown['about']), ('Event at Uber Arena, Berlin.', '', ''))
+
+    def test_ticketmaster_cache_from_an_older_event_shape_refreshes_once(self):
+        events = self.backend.event_sources
+        with tempfile.TemporaryDirectory() as folder:
+            state = Path(folder)
+            events.save_key(state, 'k')
+            self.backend.gl.save_json(state / 'live_events.json', {'at': self.backend.time.time(), 'events': []})
+            calls = []
+            fetch = lambda url, **_: calls.append(url) or {}
+            events.refresh(state, {'lat': 49.75, 'lon': 6.64}, self.backend.dt.date.today(), fetch=fetch, pause=0)
+            self.assertEqual(len(calls), 1 + len(events.GERMANY) + len(events.EUROPE))
+            events.refresh(state, {'lat': 49.75, 'lon': 6.64}, self.backend.dt.date.today(), fetch=fetch, pause=0)
+            self.assertEqual(len(calls), 1 + len(events.GERMANY) + len(events.EUROPE))
+
     def test_brief_links_jobs_and_events_by_their_real_titles(self):
         jobs = [{'title': 'Werkstudent Data Science', 'url': 'https://jobs.example/1'}]
         events = [{'title': 'Autumn theatre', 'url': 'https://events.example/1'}]
