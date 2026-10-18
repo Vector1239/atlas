@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowClockwiseIcon, ArrowDownIcon, BriefcaseIcon, CalendarBlankIcon, MapPinIcon, SlidersHorizontalIcon, XIcon } from '@phosphor-icons/react';
 import { JobListing } from './JobListing.jsx';
 import { EventListing } from './EventListing.jsx';
@@ -7,12 +7,13 @@ import { safeLink } from './format.js';
 import './explore.css';
 import DiscoveryMap from './DiscoveryMap.jsx';
 import EventFilters from './EventFilters.jsx';
-import { dayLabel, placeLabel, whenOptions } from './event-filters.js';
+import { dayLabel, placeLabel, savedEventFilters, saveEventFilters, whenOptions } from './event-filters.js';
 import { savedHome } from './map-view.js';
 
 export default function Explore({ data, act, ask, initialKind = 'all' }) {
-  const [filters, setFilters] = useState(initialKind === 'remote' ? filtersForScope(initialFilters, 'remote') : { ...initialFilters, kind: initialKind }), [bounds, setBounds] = useState(null), [inView, setInView] = useState(false), [selected, setSelected] = useState(null), [scope, setScope] = useState({ name: initialKind === 'remote' ? 'remote' : 'trier' }), [focus, setFocus] = useState(null), [moreFilters, setMoreFilters] = useState(false), [original, setOriginal] = useState(false), [gridView, setGridView] = useState(true);
+  const [filters, setFilters] = useState(() => initialKind === 'remote' ? filtersForScope(initialFilters, 'remote') : (saved => ({ ...initialFilters, ...saved, kind: initialKind === 'all' ? saved.kind || 'all' : initialKind }))(savedEventFilters())), [bounds, setBounds] = useState(null), [inView, setInView] = useState(false), [selected, setSelected] = useState(null), [scope, setScope] = useState({ name: initialKind === 'remote' ? 'remote' : 'trier' }), [focus, setFocus] = useState(null), [moreFilters, setMoreFilters] = useState(false), [original, setOriginal] = useState(false), [gridView, setGridView] = useState(true);
   const home = savedHome(data.home);
+  useEffect(() => { if (scope.name !== 'remote') saveEventFilters(filters); }, [filters, scope.name]);
   const set = (key, value) => {
     const leaveRemote = scope.name === 'remote' && (key === 'kind' && value !== 'jobs' || key === 'workplace' && value !== 'remote');
     const linked = key === 'category' ? { genre:'all' } : key === 'country' ? { city:'all' } : {};

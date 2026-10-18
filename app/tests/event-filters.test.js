@@ -41,3 +41,13 @@ test('nearest home is the default order: whole cities by distance, each city in 
   assert.deepEqual(selectExplore({ date:today, jobs:[], events:{ items } }, { ...initialFilters, kind:'events' }).map(e => e.id), ['t-venue-oct', 't-city-oct', 't-city-nov', 'lux']);
   assert.deepEqual(selectExplore({ date:today, jobs:[], events:{ items } }, { ...initialFilters, kind:'events', eventSort:'soonest' }).map(e => e.id), ['lux', 't-venue-oct', 't-city-oct', 't-city-nov']);
 });
+test('event filters are remembered between visits and bad or missing storage is ignored', async () => {
+  const { savedEventFilters, saveEventFilters } = await import('../src/event-filters.js');
+  const store = new Map(), storage = { getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, value) };
+  saveEventFilters({ ...initialFilters, kind:'events', when:'weekend', category:'Music', genre:'Jazz', country:'Germany', city:'Berlin', search:'not kept' }, storage);
+  assert.deepEqual(savedEventFilters(storage), { kind:'events', when:'weekend', category:'Music', genre:'Jazz', country:'Germany', city:'Berlin', eventSort:'nearest' });
+  store.set('atlas.explore.events', '{broken');
+  assert.deepEqual(savedEventFilters(storage), {});
+  assert.deepEqual(savedEventFilters({ getItem: () => { throw Error('blocked'); } }), {});
+  assert.doesNotThrow(() => saveEventFilters(initialFilters, undefined));
+});
