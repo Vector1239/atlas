@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initialFilters, selectExplore, groupPlaces, inBounds, cityDistance } from '../src/explore-filters.js';
+import { exploreTotals, exploreView, initialFilters, selectExplore, groupPlaces, inBounds, cityDistance, placeKey } from '../src/explore-filters.js';
 const trier = { lat:49.75565, lon:6.63935 }, berlin = { lat:52.52437, lon:13.41053 };
 const job = { id:'j1', title:'Analyst', title_en:'Analyst', company:'Team', city:'Trier', source_label:'Board', distance_from_trier:2, flags:['student-job'], location:trier };
 const event = { id:'e1', title:'Concert', city:'Trier', source:'City', category:'Music', start:'2026-10-20', location:trier };
@@ -26,4 +26,35 @@ test('searches update both layers and map wraparound remains valid', () => {
  assert.equal(inBounds({lat:0,lon:-175},{north:10,south:-10,west:170,east:190}),true);
  assert.equal(inBounds({lat:0,lon:0},{north:10,south:-10,west:170,east:190}),false);
  assert.equal(inBounds({lat:Infinity,lon:6},null),false);
+});
+test('loaded totals and map exclusions reconcile without counting unplaced listings twice', () => {
+ const totals=exploreTotals(data), items=selectExplore(data,initialFilters);
+ assert.deepEqual(totals,{jobs:2,events:2,total:4});
+ const view=exploreView(items,{bounds:{north:50,south:49,east:7,west:6}});
+ assert.deepEqual(view.visible.map(item=>item.key),['job:j1','event:e1']);
+ assert.equal(view.unplaced,1);
+ assert.equal(view.outsideArea,1);
+ assert.equal(view.visible.length+view.unplaced+view.outsideArea+view.outsideCity,totals.total);
+ assert.deepEqual(exploreTotals({}),{jobs:0,events:0,total:0});
+});
+test('including all locations restores every filtered item and selected city counts stay disjoint', () => {
+ const items=selectExplore(data,initialFilters);
+ const all=exploreView(items,{inView:false});
+ assert.deepEqual(all.visible,items);
+ assert.equal(all.unplaced+all.outsideArea+all.outsideCity,0);
+ const city=exploreView(items,{inView:false,selected:placeKey(job)});
+ assert.equal(city.visible.length,2);
+ assert.equal(city.outsideCity,2);
+ assert.equal(city.visible.length+city.outsideCity,items.length);
+ const jobs=selectExplore(data,{...initialFilters,kind:'jobs'});
+ assert.equal(exploreView(jobs,{inView:false}).visible.length,exploreTotals(data).jobs);
+});
+test('every locally loaded match remains visible beyond the old twenty-card limit', () => {
+ const jobs=Array.from({length:226},(_,i)=>({...job,id:`job-${i}`}));
+ const events=Array.from({length:10},(_,i)=>({...event,id:`event-${i}`}));
+ const loaded={...data,jobs,events:{items:events}};
+ const matches=selectExplore(loaded,initialFilters);
+ assert.equal(exploreTotals(loaded).total,236);
+ assert.equal(exploreView(matches,{inView:false}).visible.length,236);
+ assert.equal(exploreView(matches).visible.filter(item=>item.kind==='job').length,226);
 });

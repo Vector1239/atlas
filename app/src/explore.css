@@ -109,7 +109,6 @@
 .explore-listing .event-source{grid-column:2;flex-direction:row;align-items:center;flex-wrap:wrap;gap:9px;padding:0}
 .explore-listing .event-source small{margin:0;font-size:8px}
 .explore-listing .event-source .badge{font-size:8px}
-.load-listings{margin:20px auto;display:flex}
 
 .explore-context{font-size:9px;line-height:1.9;color:#8a967e;padding:14px 0 0}
 .explore-context summary{cursor:pointer;width:fit-content;color:#8c987f}
@@ -134,3 +133,5 @@
 .map-grid>.explore-results{overflow:visible;max-height:none;padding:0}
 .map-grid .explore-result-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));align-items:start;gap:16px}
 .map-grid .explore-listing .job-listing h2{font-size:17px;line-height:1.5}
+
+.explore-inventory{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 14px;margin:0 0 14px;font-size:11px;color:#829175}.explore-inventory strong{font-weight:600;color:#526846}.explore-result-note .text-button{margin-top:6px;font-size:10px}

@@ -10,6 +10,7 @@ import Tech from './Tech.jsx';
 import Updates from './Updates.jsx';
 import JobSources from './JobSources.jsx';
 import { distanceLabel } from './job-filters.js';
+import { exploreTotals } from './explore-filters.js';
 import { niceDate, safeLink } from './format.js';
 import './discovery.css';
 
@@ -59,12 +60,13 @@ function App() {
   }
   if (!data) return <div className="boot"><div className="brand-mark">A</div><h1>Atlas</h1><p>{loadError || 'Getting your day together…'}</p>{loadError && <Button onClick={load}>Try again</Button>}</div>;
   const model = data.model, sourceCount = (data.sources || []).filter(s => s.ok && !s.skipped).length;
+  const exploreCount = exploreTotals(data);
   const modelLabel = { ready: 'Gemma is ready', loading: 'Gemma is loading', downloading: 'Gemma is downloading', stopped: 'Gemma is paused' }[model.state];
   return <div className="app-shell">
     <aside className={`sidebar ${mobileNav ? 'open' : ''}`}>
       <div className="brand"><div className="brand-mark">A</div><span>atlas<span className="brand-dot">.</span></span></div>
       <div className="workspace-label">YOUR PERSONAL SPACE</div>
-      <nav aria-label="Main navigation">{nav.map(([id, label, Component]) => <button key={id} className={`nav-item ${page === id ? 'selected' : ''}`} onClick={() => navigate(id)}><Icon as={Component} /><span>{label}</span>{id === 'explore' && <span className="nav-count">{data.jobs.length + (data.events?.items.length || 0)}</span>}{id === 'chat' && data.busy && <span className="dot pulse" />}</button>)}</nav>
+      <nav aria-label="Main navigation">{nav.map(([id, label, Component]) => <button key={id} className={`nav-item ${page === id ? 'selected' : ''}`} onClick={() => navigate(id)}><Icon as={Component} /><span>{label}</span>{id === 'explore' && <span className="nav-count" title={`${exploreCount.jobs} jobs + ${exploreCount.events} events loaded`}>{exploreCount.total} total</span>}{id === 'chat' && data.busy && <span className="dot pulse" />}</button>)}</nav>
       <div className="sidebar-note"><div className="little-rule" /><p>A place for the things<br />you don’t want to forget.</p><span>TRIER, GERMANY</span></div>
       <div className="sidebar-bottom"><button className="engine-card" onClick={() => navigate('settings')}><span className={`dot ${model.ready ? 'green' : model.loading ? 'pulse' : ''}`} /><div><strong>{modelLabel}</strong><small>Powered by Hermes</small></div><Icon as={CaretRightIcon} size={14} /></button><div className="user"><div className="avatar">D</div><div><strong>Dhiraj’s workspace</strong><small>Stored on this Mac · v{data.version}</small></div></div></div>
     </aside>

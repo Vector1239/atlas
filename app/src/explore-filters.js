@@ -2,6 +2,10 @@ import { selectJobs } from './job-filters.js';
 
 export const initialFilters = { search: '', kind: 'all', group: 'all', distance: 'any', city: 'all', source: 'all', workplace: 'all', language: 'all', hideSenior: false, sort: 'distance', period: 'all', category: 'all' };
 export const placeKey = item => item.location ? `${item.location.lat},${item.location.lon}` : null;
+export function exploreTotals(data) {
+  const jobs = (data.jobs || []).length, events = (data.events?.items || []).length;
+  return { jobs, events, total:jobs + events };
+}
 export function validLocation(location) {
   return !!location && Number.isFinite(location.lat) && Number.isFinite(location.lon) && Math.abs(location.lat) <= 90 && Math.abs(location.lon) <= 180;
 }
@@ -17,6 +21,16 @@ export function inBounds(location, bounds) {
   if (!bounds) return true;
   const longitude = ((location.lon - bounds.west) % 360 + 360) % 360;
   return location.lat >= bounds.south && location.lat <= bounds.north && (bounds.east - bounds.west >= 360 || longitude <= bounds.east - bounds.west);
+}
+export function exploreView(items, { inView = true, bounds = null, selected = null } = {}) {
+  const result = { visible:[], unplaced:0, outsideArea:0, outsideCity:0 };
+  for (const item of items) {
+    if (inView && !validLocation(item.location)) result.unplaced++;
+    else if (inView && !inBounds(item.location, bounds)) result.outsideArea++;
+    else if (selected && placeKey(item) !== selected) result.outsideCity++;
+    else result.visible.push(item);
+  }
+  return result;
 }
 export function selectExplore(data, filters) {
   const jobs = filters.kind === 'events' ? [] : selectJobs(data.jobs, filters, data.saved_jobs).map(job => ({ ...job, kind: 'job', key: `job:${job.id}` }));
