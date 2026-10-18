@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'">
+<title>Atlas Browser</title>
+<link rel="stylesheet" href="toolbar.css">
+</head>
+<body>
+<header class="bar">
+  <div class="nav">
+    <button id="back" title="Back (⌘[)" aria-label="Back" disabled><svg viewBox="0 0 256 256"><path d="M160 208 80 128l80-80"/></svg></button>
+    <button id="forward" title="Forward (⌘])" aria-label="Forward" disabled><svg viewBox="0 0 256 256"><path d="m96 48 80 80-80 80"/></svg></button>
+    <button id="reload" title="Reload (⌘R)" aria-label="Reload"><svg class="reload" viewBox="0 0 256 256"><path d="M184 104h48V56"/><path d="M188.4 192a88 88 0 1 1 1.8-126.2L232 104"/></svg><svg class="stop" viewBox="0 0 256 256"><path d="M200 56 56 200M200 200 56 56"/></svg></button>
+  </div>
+  <form id="address-form" class="address" autocomplete="off">
+    <svg id="lock" class="lock" viewBox="0 0 256 256"><rect x="40" y="88" width="176" height="128" rx="8"/><path d="M92 88V60a36 36 0 0 1 72 0v28"/></svg>
+    <input id="address" type="text" spellcheck="false" aria-label="Address" placeholder="Enter a web address">
+    <span id="title" class="title"></span>
+  </form>
+  <button id="external" class="external" title="Open this page in your default browser"><svg viewBox="0 0 256 256"><path d="M216 100V40h-60M144 112l72-72M184 144v64a8 8 0 0 1-8 8H48a8 8 0 0 1-8-8V80a8 8 0 0 1 8-8h64"/></svg><span>Open in browser</span></button>
+</header>
+<div id="progress" class="progress"></div>
+<script src="toolbar.js"></script>
+</body>
+</html>
