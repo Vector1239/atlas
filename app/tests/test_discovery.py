@@ -1,5 +1,6 @@
 import datetime as dt
 import sys
+import tempfile
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -9,6 +10,19 @@ import discovery
 
 
 class DiscoveryTests(unittest.TestCase):
+    def test_new_job_cities_get_pins_only_for_exact_matches_in_the_listed_region(self):
+        towns = [{'name': 'Kirchberg', 'country_code': 'DE', 'feature_code': 'PPL', 'latitude': 50.6, 'longitude': 12.5, 'admin1': 'Saxony', 'population': 9000},
+                 {'name': 'Kirchberg', 'country_code': 'DE', 'feature_code': 'PPL', 'latitude': 49.9, 'longitude': 7.4, 'admin1': 'Rhineland-Palatinate', 'population': 3800},
+                 {'name': 'Hamburg', 'country_code': 'DE', 'feature_code': 'PPLA', 'latitude': 53.55, 'longitude': 10.0, 'population': 1800000}]
+        fetch = lambda url: {'results': [row for row in towns if row['name'].startswith(url.split('name=')[1].split('&')[0])]}
+        with tempfile.TemporaryDirectory() as folder, patch.dict(discovery.GEOCODED, clear=True):
+            path = Path(folder) / 'places.json'
+            discovery.geocode([('Kirchberg, Jagst', 'DE', 'Rhineland-Palatinate'), ('Hamb', 'DE', ''), ('Remote', 'DE', '')], path, fetch)
+            self.assertEqual(discovery.city_location('Kirchberg, Jagst')['lon'], 7.4)
+            self.assertIsNone(discovery.city_location('Hamb'))
+            self.assertIsNone(discovery.city_location('Remote'))
+            self.assertEqual(discovery.geocode([('Hamb', 'DE', '')], path, fetch), 0)  # cached, not asked again
+
     def test_english_headline_keeps_original_and_new_german_headline_waits(self):
         title = 'Uni Trier startet ins neue Semester: Mehr als 2.200 neue Studierende auf dem Campus - lokalo.de'
         item = {'title': title, 'lang': 'de'}

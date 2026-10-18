@@ -101,6 +101,7 @@ _CONFIG = {"mtime": None, "value": {}}
 _HEALTH = {"at": 0.0, "state": "offline", "gateway": False}
 _ENRICHED = {"source": None, "translations": -1, "jobs": []}
 _NEWS = {"source": None, "translations": -1, "items": []}
+discovery.load_places(STATE_DIR / "places_cache.json")
 _MARKET = {"key": None, "value": None}
 
 
@@ -345,7 +346,7 @@ def refresh_data(include_jsearch=False):
         REFRESH_STATUS["message"] = "Finding jobs in Trier and the region…"
         matcher = job_scan.Matcher(cfg.get("jobs", {}))
         status = []
-        jobs = (job_scan.fetch_bundesagentur(cfg, {0, 1}, matcher, status)
+        jobs = (job_scan.fetch_bundesagentur(cfg, {0, 1, 2}, matcher, status)
                 + job_scan.fetch_arbeitnow(cfg, {0, 1, 2}, matcher, status)
                 + job_scan.fetch_jsearch(cfg, {0, 1, 2, 3}, matcher, status, allow_network=include_jsearch))
         # Free-source refreshes preserve JSearch listings already saved locally.
@@ -414,8 +415,8 @@ def work_summary(year):
 
 def enriched_jobs(jobs):
     """Enrichment only changes when the job list or the translations do."""
-    if _ENRICHED["source"] is not jobs or _ENRICHED["translations"] != len(TRANSLATIONS):
-        _ENRICHED.update(source=jobs, translations=len(TRANSLATIONS),
+    if _ENRICHED["source"] is not jobs or _ENRICHED["translations"] != (len(TRANSLATIONS), len(discovery.GEOCODED)):
+        _ENRICHED.update(source=jobs, translations=(len(TRANSLATIONS), len(discovery.GEOCODED)),
                          jobs=[discovery.enrich_job(job, TRANSLATIONS) for job in jobs])
     return _ENRICHED["jobs"]
 
@@ -428,13 +429,17 @@ def enriched_news(news):
 
 
 def describe_jobs():
-    """Read Bundesagentur descriptions in the background (cached a week) so the job market covers them too."""
+    """After a refresh: map pins for new cities, then Bundesagentur descriptions (cached a week) for the job market."""
     if DESCRIBE_STATUS["running"]:
         return
     DESCRIBE_STATUS.update(running=True, fetched=0)
     try:
         with LOCK:
             jobs = [dict(job) for job in CACHE.get("jobs", [])]
+        with contextlib.suppress(Exception):
+            places = {(row["city"], str(row.get("country") or "DE").upper(), row.get("region_name", ""))
+                      for row in enriched_jobs(jobs) if not row["location"] and row["city"] != "Location not provided"}
+            discovery.geocode(sorted(places), STATE_DIR / "places_cache.json", gl.http_json)
         found = job_details.describe(jobs, STATE_DIR, stop=STOP, progress=lambda n: DESCRIBE_STATUS.update(fetched=n))
         with LOCK:
             DESCRIPTIONS.clear()
