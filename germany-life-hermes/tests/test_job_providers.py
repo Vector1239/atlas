@@ -175,16 +175,26 @@ print(json.dumps(job_providers.provider_state()))
         jobicy = {"jobs": [{"id": 3, "url": "https://jobicy.com/jobs/3", "jobTitle": "Machine Learning Engineer", "companyName": "C",
                             "jobGeo": "Germany", "pubDate": today, "jobDescription": "PyTorch", "salaryMin": 50000,
                             "salaryMax": 70000, "salaryCurrency": "EUR", "salaryPeriod": "yearly"}]}
+        stamp = dt.datetime.now(dt.timezone.utc).timestamp()
+        himalayas = {"jobs": [
+            {"guid": "https://himalayas.app/companies/d/jobs/4", "title": "Data Engineer", "companyName": "US startup",
+             "locationRestrictions": [], "pubDate": stamp, "expiryDate": stamp + 86400, "description": "Spark",
+             "minSalary": 40, "maxSalary": 60, "currency": "USD", "salaryPeriod": "hourly"},
+            {"guid": "https://himalayas.app/companies/e/jobs/5", "title": "Data Analyst", "companyName": "E",
+             "locationRestrictions": ["United States"], "pubDate": stamp, "description": "SQL"}]}
         cfg = {"jobs": {"include": ["data", "machine learning"], "remote": {"remotive_categories": ["data"],
-                                                                            "jobicy_industries": ["data-science"], "jobicy_geos": ["europe"]}}}
-        with patch.object(gl, "http_json", side_effect=lambda url, **_: remotive if "remotive" in url else jobicy) as fetch:
+                                                                            "jobicy_industries": ["data-science"], "jobicy_geos": ["europe"],
+                                                                            "himalayas_queries": ["data"]}}}
+        boards = {"remotive": remotive, "jobicy": jobicy, "himalayas": himalayas}
+        with patch.object(gl, "http_json", side_effect=lambda url, **_: next(v for k, v in boards.items() if k in url)) as fetch:
             status = []
             jobs = remote_boards.fetch_remote(cfg, {2, 3}, job_scan.Matcher(cfg["jobs"]), status)
             remote_boards.fetch_remote(cfg, {2, 3}, job_scan.Matcher(cfg["jobs"]), [])
-            self.assertEqual(fetch.call_count, 2)  # the second scan is served from the 12-hour cache
+            self.assertEqual(fetch.call_count, 3)  # the second scan is served from the 12-hour cache
             self.assertEqual(remote_boards.fetch_remote(cfg, {0, 1}, job_scan.Matcher(cfg["jobs"]), []), [])
         self.assertEqual([(j["source"], j["url"], j["ring"]) for j in jobs],
-                         [("Remotive", "https://remotive.com/remote-jobs/data/1", 3), ("Jobicy", "https://jobicy.com/jobs/3", 2)])
+                         [("Remotive", "https://remotive.com/remote-jobs/data/1", 3), ("Jobicy", "https://jobicy.com/jobs/3", 2),
+                          ("Himalayas", "https://himalayas.app/companies/d/jobs/4", 3)])
         self.assertTrue(all(j["remote"] and j["city"] == "Remote" for j in jobs))
-        self.assertEqual(jobs[1]["salary"]["period"], "YEAR")
-        self.assertIn("1 limited to other regions skipped", status[0])
+        self.assertEqual((jobs[1]["salary"]["period"], jobs[2]["salary"]["period"], jobs[2]["remote_scope"]), ("YEAR", "HOUR", "Worldwide"))
+        self.assertIn("2 that hire only elsewhere", status[0])
