@@ -118,6 +118,7 @@ def fetch_bundesagentur(cfg: dict, rings: set[int], matcher: Matcher, status: li
                     or offer.get("datumErsteVeroeffentlichung") or offer.get("aktuelleVeroeffentlichungsdatum", ""),
                     "url": f"https://www.arbeitsagentur.de/jobsuche/jobdetail/{urllib.parse.quote(refnr)}",
                     "text": "", "remote": bool(offer.get("homeofficemoeglich")), "visa": False,
+                    "occupation": gl.clean_text(offer.get("beruf", ""), 200),
                 })
     status.append(_status_line("Bundesagentur", calls, errors, len(found)))
     return found
@@ -163,6 +164,8 @@ def fetch_arbeitnow(cfg: dict, rings: set[int], matcher: Matcher, status: list) 
                 "where": item.get("location") or "?", "posted": posted.date().isoformat() if posted else "",
                 "url": item.get("url", ""), "text": gl.clean_text(item.get("description", ""), 4000),
                 "remote": bool(item.get("remote")), "visa": visa,
+                "tags": [gl.clean_text(t, 80) for t in (item.get("tags") or [])[:12] if isinstance(t, str)],
+                "job_types": [gl.clean_text(t, 40) for t in (item.get("job_types") or [])[:4] if isinstance(t, str)],
             }
     found = [job for job in by_slug.values() if job["ring"] in rings]
     status.append(_status_line("Arbeitnow", calls, errors, len(found)))

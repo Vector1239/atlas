@@ -83,12 +83,23 @@ def normalize_jsearch(item, ring):
             posted = dt.datetime.fromtimestamp(item["job_posted_at_timestamp"], dt.timezone.utc).isoformat()
         except (OverflowError, ValueError, OSError):
             pass
+    salary = {}
+    low, high = item.get("job_min_salary"), item.get("job_max_salary")
+    if any(isinstance(v, (int, float)) and v > 0 for v in (low, high)):
+        salary = {"min": low if isinstance(low, (int, float)) else None, "max": high if isinstance(high, (int, float)) else None,
+                  "currency": text("job_salary_currency")[:3], "period": text("job_salary_period")[:10].upper()}
+    experience = item.get("job_required_experience") if isinstance(item.get("job_required_experience"), dict) else {}
+    months = experience.get("required_experience_in_months")
+    skills = item.get("job_required_skills") if isinstance(item.get("job_required_skills"), list) else []
     return {"source": "JSearch", "source_id": item["job_id"], "ring": ring,
             "title": gl.clean_text(text("job_title"), 500), "company": gl.clean_text(text("employer_name"), 300),
             "where": gl.clean_text(place) or "?", "city": gl.clean_text(city), "country": text("job_country"),
             "region_name": text("job_state"), "posted": posted[:10], "url": link,
             "text": gl.clean_text(text("job_description"), 30000), "via": gl.clean_text(text("job_publisher")),
-            "remote": item.get("job_is_remote") is True, "visa": False}
+            "remote": item.get("job_is_remote") is True, "visa": False,
+            "employment_type": text("job_employment_type")[:20], "salary": salary,
+            "experience_months": months if isinstance(months, (int, float)) and 0 <= months <= 600 else None,
+            "skills": [gl.clean_text(s, 60) for s in skills[:20] if isinstance(s, str)]}
 
 
 def search_url(search, host, max_age):

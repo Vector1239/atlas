@@ -82,11 +82,42 @@ def posting_text(html):
     return "", ""
 
 
+def _key(job):
+    return hashlib.sha256(f"{job['source']}:{job['source_id']}:{job['url']}".encode()).hexdigest()
+
+
+def describe(jobs, state_dir, limit=60, stop=None, pause=0.5, progress=None):
+    """Descriptions for Bundesagentur listings, which arrive without one: {job id: text}.
+
+    Reads the 7-day cache once and fetches at most `limit` missing ones, one at a time."""
+    path = state_dir / "job_details.json"
+    with LOCK, gl.file_lock(path):
+        cache = gl.load_json(path, {})
+    found, fetched = {}, 0
+    for job in jobs:
+        if job.get("text") or job.get("source") != "Bundesagentur" or not job.get("id"):
+            continue
+        cached = cache.get(_key(job), {})
+        if cached.get("text") and time.time() - cached.get("at", 0) < 7 * 86400:
+            found[job["id"]] = cached["text"]
+            continue
+        if fetched >= limit or (stop is not None and stop.is_set()) or cached.get("at", 0) > time.time() - 900:
+            continue
+        fetched += 1
+        text = load(job, state_dir).get("text", "")
+        if text:
+            found[job["id"]] = text
+        if progress:
+            progress(fetched)
+        time.sleep(pause)
+    return found
+
+
 def load(job, state_dir):
     if job.get("text"):
         return {"text": job["text"], "detail_source": job.get("detail_source", job["source"])}
     path = state_dir / "job_details.json"
-    key = hashlib.sha256(f"{job['source']}:{job['source_id']}:{job['url']}".encode()).hexdigest()
+    key = _key(job)
     with LOCK, gl.file_lock(path):
         cached = gl.load_json(path, {}).get(key, {})
     if time.time() - cached.get("at", 0) < (7 * 86400 if cached.get("text") else 900):

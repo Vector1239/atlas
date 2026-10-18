@@ -178,6 +178,31 @@ class AtlasTests(unittest.TestCase):
         self.assertNotIn('https://other.example', result)
         self.assertEqual(rows[0]['url'], 'https://publisher.example/article_(original)')
 
+    def test_brief_links_jobs_and_events_by_their_real_titles(self):
+        jobs = [{'title': 'Werkstudent Data Science', 'url': 'https://jobs.example/1'}]
+        events = [{'title': 'Autumn theatre', 'url': 'https://events.example/1'}]
+        result = self.backend.attach_brief_links('- [Invented role][job-0]\n- Made up [Nope][job-7]\n- See [event-0]', [], jobs, events)
+        self.assertIn('[Werkstudent Data Science][job-0]', result)
+        self.assertIn('Made up Nope', result)
+        self.assertIn('[Autumn theatre][event-0]', result)
+        self.assertIn('[job-0]: <https://jobs.example/1>', result)
+        self.assertNotIn('Invented role', result)
+
+    def test_job_market_counts_roles_skills_experience_and_pay_from_postings(self):
+        insights = self.backend.job_insights
+        jobs = [{'id': '1', 'title': 'Werkstudent Data Science', 'flags': ['student-job'], 'city': 'Trier',
+                 'text': 'Erste Erfahrungen mit Python und SQL. Vergütung: 15,50 € pro Stunde. R&D team.'},
+                {'id': '2', 'title': 'Data Engineer', 'flags': [], 'city': 'Mainz',
+                 'text': 'Seit 20 Jahren am Markt. You bring 3+ years of experience with Spark and Python. Salary €55,000 – €65,000 per year. Jobticket 49 €.'},
+                {'id': '3', 'title': 'Datenanalyst', 'flags': [], 'city': 'Trier', 'text': ''}]
+        market = insights.analyze(jobs, '## Skills\n- Strong: <e.g. Spark> Python, SQL\n- Learning: Spark\n## Other\nAWS')
+        self.assertEqual([row['name'] for row in market['families']], ['Data science', 'Data engineering', 'Analytics & BI'])
+        self.assertEqual((market['total'], market['described']), (3, 2))
+        self.assertEqual({row['name']: row['count'] for row in market['skills']}, {'Python': 2, 'SQL': 1, 'Spark': 1})
+        self.assertEqual(market['gaps'], ['Spark'])
+        self.assertEqual({row['name']: row['count'] for row in market['experience']['buckets']}, {'0–1 years': 1, '2–3 years': 1, '4–5 years': 0, '6+ years': 0})
+        self.assertEqual((market['pay']['hourly']['median'], market['pay']['annual']['median']), (15.5, 60000))
+
     def test_article_images_require_auth_and_only_serve_the_owned_cache(self):
         path = '/api/news/images/' + 'a' * 64
         with self.assertRaises(urllib.error.HTTPError) as result:
