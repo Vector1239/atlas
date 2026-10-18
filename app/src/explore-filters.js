@@ -1,8 +1,9 @@
 import { selectJobs } from './job-filters.js';
+import { matchesEvent } from './event-filters.js';
 
-export const initialFilters = { search: '', kind: 'all', group: 'all', distance: 'any', city: 'all', source: 'all', workplace: 'all', language: 'all', hideSenior: false, sort: 'distance', period: 'all', category: 'all' };
+export const initialFilters = { search: '', kind: 'all', group: 'all', distance: 'any', city: 'all', source: 'all', workplace: 'all', language: 'all', hideSenior: false, sort: 'distance', when: 'any', category: 'all', genre: 'all', country: 'all', eventSort: 'soonest' };
 export function filtersForScope(filters, scope) {
-  return { ...filters, city: 'all', distance: 'any',
+  return { ...filters, city: 'all', country: 'all', distance: 'any',
     workplace: scope === 'remote' ? 'remote' : 'all',
     ...(scope === 'remote' ? { kind: 'jobs', sort: 'newest', source: 'all' } : {}) };
 }
@@ -41,15 +42,12 @@ const remoteSources = new Set(['Himalayas', 'Remote OK', 'Jobicy']);
 export function selectExplore(data, filters, scope) {
   const sourceJobs = scope === 'remote' ? data.jobs.filter(job => remoteSources.has(job.source || job.source_label)) : data.jobs;
   const jobs = filters.kind === 'events' ? [] : selectJobs(sourceJobs, filters, data.saved_jobs).map(job => ({ ...job, kind: 'job', key: `job:${job.id}` }));
-  const cutoff = new Date(`${data.date}T12:00:00`); cutoff.setDate(cutoff.getDate() + Number(filters.period));
   const events = filters.kind === 'jobs' ? [] : (data.events?.items || []).filter(event => {
     const distance = cityDistance(event.location);
-    return `${event.title} ${event.city} ${event.venue} ${event.category} ${event.source}`.toLowerCase().includes(filters.search.trim().toLowerCase())
-      && (filters.period === 'all' || new Date(`${event.start}T12:00:00`) <= cutoff)
-      && (filters.category === 'all' || event.category === filters.category)
-      && (filters.city === 'all' || event.city === filters.city)
+    return matchesEvent(event, filters, data.date)
       && (filters.distance === 'any' || distance !== null && distance <= Number(filters.distance));
   }).map(event => ({ ...event, kind: 'event', key: `event:${event.id}` }));
+  if (filters.eventSort === 'nearest') events.sort((a, b) => (cityDistance(a.location) ?? Infinity) - (cityDistance(b.location) ?? Infinity) || a.start.localeCompare(b.start));
   // Alternate the two kinds so events don't get buried beneath a full job feed.
   return Array.from({ length: Math.max(jobs.length, events.length) }, (_, i) => [jobs[i], events[i]]).flat().filter(Boolean);
 }

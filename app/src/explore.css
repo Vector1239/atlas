@@ -137,3 +137,22 @@
 .explore-inventory{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 14px;margin:0 0 14px;font-size:11px;color:#829175}.explore-inventory strong{font-weight:600;color:#526846}.explore-result-note .text-button{margin-top:6px;font-size:10px}
 
 .explore-browse-all{margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:11px}.explore-results{scroll-margin-top:18px}
+.event-filter-panel{display:flex;flex-direction:column;gap:10px;padding:12px 0 13px;border-top:1px solid #e1e5d9}
+.event-chip-row{display:flex;flex-wrap:wrap;gap:6px}
+.event-chip{padding:6px 11px;border:1px solid #e0e5d6;border-radius:999px;background:#fff;font-size:10px;color:#5d6d50;line-height:1.3;white-space:nowrap}
+.event-chip small{font-size:9px;color:#9aa58c;margin-left:3px;font-variant-numeric:tabular-nums}
+.event-chip:hover{background:#f5f7f0}
+.event-chip.active{background:#7a5a39;border-color:#7a5a39;color:#fff}
+.event-chip.active small{color:#f1e3d2}
+.event-filter-selects{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:9px}
+.event-filter-selects label{margin:0;min-width:0;font-size:9px;font-weight:500;color:#777f6c;gap:5px}
+.event-filter-selects select{width:100%;padding:8px 7px;font-size:10px;border-color:#dfe4d5;color:#424f37}
+.event-filter-clear{align-self:flex-start;font-size:9px;display:flex;align-items:center;gap:4px}
+.event-day-heading{font:600 9px/1.4 -apple-system,sans-serif;letter-spacing:1.2px;text-transform:uppercase;color:#9a7a57;padding:8px 2px 0;border-top:1px solid #ece4d8;margin-top:4px}
+.explore-result-list>.event-day-heading:first-child{border-top:0;margin-top:0;padding-top:0}
+.event-body>p.event-what{color:#5a6b4b;font-size:12px}
+.explore-listing .event-body>p.event-what{font-size:11px}
+.event-about{font-size:10px;color:#8b9a7b;margin:-4px 0 10px}
+.event-about summary{cursor:pointer;width:fit-content;padding:3px 0}
+.event-about p{font-size:10px;line-height:1.8;margin-top:6px;max-width:630px;color:#7d8c6d}
+.event-about strong{font-weight:600}

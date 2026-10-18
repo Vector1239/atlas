@@ -14,7 +14,7 @@ test('mixed results preserve both types and grouped city counts; unknown pins st
  assert.equal(inBounds(berlin,{north:50,south:49,east:7,west:6}),false);
 });
 test('layer, radius and event dates combine without treating unknown distance as zero', () => {
- assert.deepEqual(selectExplore(data,{...initialFilters,kind:'events',period:'7'}).map(i=>i.id),['e1']);
+ assert.deepEqual(selectExplore(data,{...initialFilters,kind:'events',when:'7'}).map(i=>i.id),['e1']);
  assert.deepEqual(selectExplore(data,{...initialFilters,distance:'25'}).map(i=>i.id),['j1','e1']);
  assert.equal(selectExplore(data,{...initialFilters,kind:'jobs',group:'saved'}).length,1);
  assert.equal(selectExplore(data,{...initialFilters,kind:'events',category:'Culture'}).length,0);
