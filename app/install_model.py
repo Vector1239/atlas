@@ -32,20 +32,36 @@ def install(folder, verify_only=False):
             ready.unlink(missing_ok=True)
             raise
     else:
-        if not verify_only:
-            offset = partial.stat().st_size if partial.exists() else 0
-            url = f"https://huggingface.co/{MODEL['repository']}/resolve/{MODEL['revision']}/{MODEL['source_filename']}?download=true"
-            headers = {'User-Agent': 'Atlas model installer (+https://github.com/Vector1239/atlas)'}
-            if offset:
-                headers['Range'] = f'bytes={offset}-'
-            with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60) as response:
-                resumed = response.status == 206 and response.headers.get('Content-Range', '').startswith(f'bytes {offset}-')
-                if response.status == 206 and not resumed:
-                    raise ValueError('The model server returned an unexpected resume position.')
-                with partial.open('ab' if resumed else 'wb') as output:
-                    while chunk := response.read(8 * 1024 * 1024):
-                        output.write(chunk)
-        verify(partial)
+        complete = False
+        if partial.exists() and partial.stat().st_size >= MODEL['size']:
+            # Resuming past the end gets HTTP 416, so check a finished download first.
+            try:
+                verify(partial)
+                complete = True
+            except ValueError:
+                partial.unlink()  # a corrupt full-size file would fail the same way on every resume
+                if verify_only:
+                    raise
+        if not complete:
+            if not verify_only:
+                offset = partial.stat().st_size if partial.exists() else 0
+                url = f"https://huggingface.co/{MODEL['repository']}/resolve/{MODEL['revision']}/{MODEL['source_filename']}?download=true"
+                headers = {'User-Agent': 'Atlas model installer (+https://github.com/Vector1239/atlas)'}
+                if offset:
+                    headers['Range'] = f'bytes={offset}-'
+                with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60) as response:
+                    resumed = response.status == 206 and response.headers.get('Content-Range', '').startswith(f'bytes {offset}-')
+                    if response.status == 206 and not resumed:
+                        raise ValueError('The model server returned an unexpected resume position.')
+                    with partial.open('ab' if resumed else 'wb') as output:
+                        while chunk := response.read(8 * 1024 * 1024):
+                            output.write(chunk)
+            try:
+                verify(partial)
+            except ValueError:
+                if partial.exists() and partial.stat().st_size >= MODEL['size']:
+                    partial.unlink()
+                raise
         partial.replace(target)
     ready.write_text(MODEL['sha256'] + '\n')
     print(f"{MODEL['name']} verified and installed ({MODEL['size']/1e9:.2f} GB).")

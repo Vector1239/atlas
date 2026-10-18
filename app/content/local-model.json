@@ -4,7 +4,7 @@
   "alias": "atlas-local",
   "filename": "Gemma-4-12B-Q4_K_M.gguf",
   "quantization": "Q4_K_M",
-  "context": 16384,
+  "context": 65536,
   "repository": "unsloth/gemma-4-12b-it-GGUF",
   "revision": "fc034cfff751157913579611efad8462ac1be606",
   "source_filename": "gemma-4-12b-it-Q4_K_M.gguf",

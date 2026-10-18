@@ -61,9 +61,9 @@ backend they run in a container that can only see this project folder.
    hermes config set terminal.backend docker
    ```
 
-3. The next step (`./install.sh`) prints two `docker_volumes` lines. Add them to
+3. The next step (`./install.sh`) prints the `docker_volumes` lines. Add them to
    `~/.hermes/config.yaml` under `terminal:` (`open -e ~/.hermes/config.yaml`), then run
-   `hermes gateway restart`. The project is mounted read-only, and only `data/` is writable.
+   `hermes gateway restart`. The agent sees only the scripts, config, your profile (read-only) and `data/`; `state/`, with your chats and saved API keys, stays out of its reach.
 
 Skipping Docker for now is fine. Run `./install.sh local` in the next step instead, and leave
 Hermes' approval prompts on (`approvals.mode: smart`, the default).

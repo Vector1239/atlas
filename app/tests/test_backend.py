@@ -155,6 +155,16 @@ class AtlasTests(unittest.TestCase):
         self.assertIn('[Trier campus update][news-0] · Publisher', result)
         self.assertIn('Weather: rain', result)
 
+    def test_brief_keeps_lines_between_regions_and_does_not_repeat_news(self):
+        rows = [{'title': f'Story {i}', 'language': 'en', 'ring': ring, 'source': 'P', 'url': f'https://p.example/{i}'}
+                for i, ring in enumerate((0, 0, 2))]
+        text = ('- Early pick [news-1]\n**Trier**:\n- A [news-0]\n⏰ **Deadlines**: pay rent\n'
+                '**Germany**:\n- B [news-2]\n🍽️ Mensa: soup')
+        result = self.backend.attach_brief_links(text, rows)
+        self.assertIn('⏰ **Deadlines**: pay rent', result)
+        self.assertIn('🍽️ Mensa: soup', result)
+        self.assertEqual(result.count('][news-1]'), 1)
+
     def test_background_translation_leaves_chat_available_and_saves_only_one_batch(self):
         import io
         titles = [f'Neue Ausstellung Nummer {i}' for i in range(5)]
