@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { distanceFrom, initialTechFilters, selectTech } from '../src/tech-filters.js';
+import { distanceFrom, groupTechEvents, initialTechFilters, selectTech } from '../src/tech-filters.js';
 const home = { lat:49.7499, lon:6.6371 };
 const tech = { events:[
   { title:'Near conference',id:'near',kind:'conference',city:'Trier',country:'Germany',location:home,start:'2026-10-20',end:'2026-10-21' },
@@ -23,4 +23,45 @@ test('source filters match duplicate provenance and searches include topics', ()
   const listings = { events:[{...tech.events[0],source:'Calendar',listed_by:[{name:'MLH'},{name:'Calendar'}],topics:['Robotics']}] };
   assert.equal(selectTech(listings,{...initialTechFilters,source:'MLH',search:'Robotics'},home,'2026-10-17').length,1);
   assert.equal(selectTech(listings,{...initialTechFilters,source:'Devpost'},home,'2026-10-17').length,0);
+});
+
+const meetup = { id:'first', title:'Chaostreff', kind:'event', source:'Maschinendeck Trier',
+  url:'https://maschinendeck.org/', city:'Trier', country:'Germany', venue:'Vereinsheim',
+  location:home, start:'2026-10-20', end:'2026-10-20', time_note:'20:00–23:59 CEST' };
+const nextMeetup = { ...meetup, id:'second', start:'2026-10-27', end:'2026-10-27', time_note:'20:00–23:59 CET' };
+test('recurring cached listings stack with sorted dates and their individual times and links', () => {
+  const rows = [nextMeetup,meetup];
+  const before = structuredClone(rows);
+  const [group] = groupTechEvents(rows);
+  assert.equal(group.start,meetup.start);
+  assert.deepEqual(group.occurrences,[meetup,nextMeetup]);
+  assert.deepEqual(rows,before);
+  assert.equal(groupTechEvents([meetup,nextMeetup,meetup])[0].occurrences.length,2);
+});
+test('series identity supports separate registration links while distinct series and places stay separate', () => {
+  const first = { ...meetup, series_id:'public-calendar-id' };
+  const second = { ...nextMeetup, series_id:first.series_id, url:'https://example.org/next-meeting' };
+  assert.equal(groupTechEvents([first,second]).length,1);
+  for (const change of [ {city:'Berlin'}, {venue:'Another venue'}, {source:'Another club'},
+    {series_id:'another-id'}, {title:'Chaostreff 2027'}, {kind:'conference'} ]) {
+    assert.equal(groupTechEvents([first,{...second,...change}]).length,2);
+  }
+  assert.equal(groupTechEvents([meetup,{...nextMeetup,url:'https://other.example/'}]).length,2);
+});
+test('dates are filtered before stacking and the next date advances after an occurrence ends', () => {
+  const listings = {events:[meetup,nextMeetup]};
+  const all = groupTechEvents(selectTech(listings,initialTechFilters,home,'2026-10-18'));
+  const week = groupTechEvents(selectTech(listings,{...initialTechFilters,period:'7'},home,'2026-10-18'));
+  const later = groupTechEvents(selectTech(listings,initialTechFilters,home,'2026-10-21'));
+  assert.equal(all.length,1);
+  assert.equal(all[0].occurrences.length,2);
+  assert.equal(week[0].occurrences.length,1);
+  assert.equal(later[0].start,'2026-10-27');
+  assert.equal(later[0].id,all[0].id);
+  assert.equal(groupTechEvents(selectTech(listings,{...initialTechFilters,city:'Berlin'},home,'2026-10-18')).length,0);
+});
+test('separate same-day sessions retain their times and listings without identity stay individual', () => {
+  const evening = {...meetup,id:'evening',time_note:'21:00–23:59 CEST'};
+  assert.equal(groupTechEvents([meetup,evening])[0].occurrences.length,2);
+  assert.equal(groupTechEvents([{...meetup,url:undefined},{...nextMeetup,url:undefined}]).length,2);
 });

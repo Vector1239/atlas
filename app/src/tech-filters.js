@@ -19,3 +19,28 @@ export function selectTech(tech, filters, home, today) {
     && (filters.period === 'all' || item.start <= cutoff.toISOString().slice(0,10)))
     .sort((a,b) => (filters.sort === 'nearest' ? (a.distance ?? Infinity) - (b.distance ?? Infinity) : 0) || a.start.localeCompare(b.start) || a.title.localeCompare(b.title));
 }
+
+const normalized = value => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+// Group only the filtered occurrences, so each card's next date matches the view.
+export function groupTechEvents(events) {
+  const groups = new Map();
+  for (const event of events) {
+    const identity = event.series_id || event.url;
+    const key = identity && event.source && event.title
+      ? JSON.stringify([identity, ...[event.source, event.series_id ? 'series' : 'listing',
+        event.kind, event.title, event.city, event.country, event.venue,
+        event.organizer, event.online ? 'online' : 'in person'].map(normalized)])
+      : `individual:${event.id || groups.size}`;
+    if (!groups.has(key)) groups.set(key, { ...event, id:key, occurrences:[] });
+    const group = groups.get(key);
+    if (!group.occurrences.some(item => item.start === event.start && item.end === event.end
+      && item.starts_at === event.starts_at && item.ends_at === event.ends_at
+      && item.time_note === event.time_note)) group.occurrences.push(event);
+  }
+  return [...groups.values()].map(group => {
+    const occurrences = group.occurrences.sort((a,b) => a.start.localeCompare(b.start)
+      || (a.starts_at || a.time_note || '').localeCompare(b.starts_at || b.time_note || ''));
+    return { ...occurrences[0], id:group.id, occurrences };
+  });
+}

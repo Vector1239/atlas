@@ -111,6 +111,7 @@ def maschinendeck_rows(payload, today):
                           city='Trier', country='Germany', venue=plain(event.get('location'),400),
                           description=plain(event.get('description')) or 'Open hacker and maker community meeting. See the public calendar for participation details.',
                           time_note=f'{start:%H:%M}–{end:%H:%M} {start.tzname()}', starts_at=start.isoformat(), ends_at=end.isoformat(),
+                          series_id=plain(event.get('uid'),300),
                           cancelled=str(event.get('status','')).upper() == 'CANCELLED',
                           source_url='https://maschinendeck.org/', authority='calendar',
                           calendar_url='https://nextcloud.maschinendeck.org/index.php/apps/calendar/p/tCy8jLHHdX3oRWQG')

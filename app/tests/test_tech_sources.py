@@ -37,6 +37,7 @@ class TechSourceTests(unittest.TestCase):
         rows = sources.maschinendeck_rows({'code':200,'data':events},TODAY)
         self.assertEqual(len(rows),2)
         self.assertNotEqual(rows[0]['id'],rows[1]['id'])
+        self.assertEqual([row['series_id'] for row in rows],['same-series','same-series'])
         self.assertEqual(rows[0]['time_note'],'20:00–23:59 CEST')
         self.assertEqual(rows[1]['time_note'],'20:00–23:59 CET')
         self.assertTrue(all(row['city']=='Trier' for row in rows))
