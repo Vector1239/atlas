@@ -156,3 +156,4 @@
 .event-about summary{cursor:pointer;width:fit-content;padding:3px 0}
 .event-about p{font-size:10px;line-height:1.8;margin-top:6px;max-width:630px;color:#7d8c6d}
 .event-about strong{font-weight:600}
+.event-day-heading{grid-column:1/-1}

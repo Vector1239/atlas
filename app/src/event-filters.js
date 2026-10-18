@@ -1,6 +1,6 @@
 // Event-only filters for the Events tab: dates, place, type and genre, each with live counts.
 export const whenOptions = [['any', 'Any date'], ['today', 'Today'], ['weekend', 'This weekend'], ['7', 'Next 7 days'], ['30', 'Next 30 days']];
-export const eventSorts = [['soonest', 'Soonest first'], ['nearest', 'Nearest home first']];
+export const eventSorts = [['nearest', 'Nearest home first'], ['soonest', 'Soonest first']];
 
 const day = value => new Date(`${value}T12:00:00`);
 const iso = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -44,6 +44,8 @@ export function eventFacets(events, filters, today) {
   return { categories: tally(without('category'), 'category'), genres: tally(inCategory, 'genre'),
     countries: tally(without('country'), 'country'), cities: tally(inCountry, 'city') };
 }
+
+export const placeLabel = event => [event.city, event.country].filter(Boolean).join(', ') || 'Place to be confirmed';
 
 export function dayLabel(event, today) {
   if (event.start < today) return 'On now';

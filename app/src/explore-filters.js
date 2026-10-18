@@ -1,7 +1,7 @@
 import { selectJobs } from './job-filters.js';
 import { matchesEvent } from './event-filters.js';
 
-export const initialFilters = { search: '', kind: 'all', group: 'all', distance: 'any', city: 'all', source: 'all', workplace: 'all', language: 'all', hideSenior: false, sort: 'distance', when: 'any', category: 'all', genre: 'all', country: 'all', eventSort: 'soonest' };
+export const initialFilters = { search: '', kind: 'all', group: 'all', distance: 'any', city: 'all', source: 'all', workplace: 'all', language: 'all', hideSenior: false, sort: 'distance', when: 'any', category: 'all', genre: 'all', country: 'all', eventSort: 'nearest' };
 export function filtersForScope(filters, scope) {
   return { ...filters, city: 'all', country: 'all', distance: 'any',
     workplace: scope === 'remote' ? 'remote' : 'all',
@@ -47,7 +47,12 @@ export function selectExplore(data, filters, scope) {
     return matchesEvent(event, filters, data.date)
       && (filters.distance === 'any' || distance !== null && distance <= Number(filters.distance));
   }).map(event => ({ ...event, kind: 'event', key: `event:${event.id}` }));
-  if (filters.eventSort === 'nearest') events.sort((a, b) => (cityDistance(a.location) ?? Infinity) - (cityDistance(b.location) ?? Infinity) || a.start.localeCompare(b.start));
+  if (filters.eventSort === 'nearest') {
+    // Venues in one city sit a few hundred metres apart, so rank whole cities by distance and keep each city's events in date order.
+    const place = event => `${event.city}|${event.country}`, near = new Map();
+    for (const event of events) near.set(place(event), Math.min(near.get(place(event)) ?? Infinity, cityDistance(event.location) ?? Infinity));
+    events.sort((a, b) => near.get(place(a)) - near.get(place(b)) || place(a).localeCompare(place(b)) || a.start.localeCompare(b.start));
+  } else events.sort((a, b) => a.start.localeCompare(b.start));
   // Alternate the two kinds so events don't get buried beneath a full job feed.
   return Array.from({ length: Math.max(jobs.length, events.length) }, (_, i) => [jobs[i], events[i]]).flat().filter(Boolean);
 }
