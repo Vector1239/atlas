@@ -135,3 +135,5 @@
 .map-grid .explore-listing .job-listing h2{font-size:17px;line-height:1.5}
 
 .explore-inventory{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 14px;margin:0 0 14px;font-size:11px;color:#829175}.explore-inventory strong{font-weight:600;color:#526846}.explore-result-note .text-button{margin-top:6px;font-size:10px}
+
+.explore-browse-all{margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:11px}.explore-results{scroll-margin-top:18px}
