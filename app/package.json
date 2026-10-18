@@ -1,6 +1,6 @@
 {
   "name": "atlas-local",
-  "version": "1.12.0",
+  "version": "1.12.1",
   "description": "Your local life assistant, powered by Hermes and Gemma",
   "private": true,
   "type": "module",

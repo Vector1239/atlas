@@ -1,8 +1,12 @@
-"""Install the pinned local model; verify bytes before making it available to Atlas."""
+"""Install the pinned local model into Hermes' models folder; verify bytes before using it.
+
+Hermes serves every GGUF in ~/.hermes/models, so that is the default destination."""
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
+import shutil
 import urllib.request
 
 MODEL = json.loads((Path(__file__).parent / 'content/local-model.json').read_text())
@@ -20,11 +24,14 @@ def verify(path, spec=None):
         raise ValueError('The model checksum does not match its published SHA-256. Do not use this file.')
 
 
-def install(folder, verify_only=False):
+def install(folder, verify_only=False, legacy=None):
     folder.mkdir(parents=True, exist_ok=True)
     target = folder / MODEL['filename']
     partial = target.with_suffix(target.suffix + '.part')
     ready = target.with_suffix('.ready')
+    if legacy and legacy != target and legacy.exists() and not target.exists():
+        shutil.move(str(legacy), str(target))  # earlier Atlas versions kept it there; no new download
+        legacy.with_suffix('.ready').unlink(missing_ok=True)
     if target.exists():
         try:
             verify(target)
@@ -64,12 +71,13 @@ def install(folder, verify_only=False):
                 raise
         partial.replace(target)
     ready.write_text(MODEL['sha256'] + '\n')
-    print(f"{MODEL['name']} verified and installed ({MODEL['size']/1e9:.2f} GB).")
+    print(f"{MODEL['name']} verified and installed ({MODEL['size']/1e9:.2f} GB) in {folder}.")
+    print("If Hermes was already running, stop and start it once (Atlas → Settings → Local model) so it lists the model.")
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--folder', type=Path, default=Path.home() / '.cache/Atlas/models')
+    parser.add_argument('--folder', type=Path, default=Path(os.environ.get('HERMES_HOME') or Path.home() / '.hermes') / 'models')
     parser.add_argument('--verify-only', action='store_true', help='Verify an existing model or completed .part download without downloading.')
     args = parser.parse_args()
-    install(args.folder, args.verify_only)
+    install(args.folder, args.verify_only, legacy=Path.home() / '.cache/Atlas/models' / MODEL['filename'])

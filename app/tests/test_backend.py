@@ -29,6 +29,7 @@ class AtlasTests(unittest.TestCase):
         shutil.copy(cls.project / 'templates/profile.md', cls.project / 'profile.md')
         cls.old_env = os.environ.get('ATLAS_PROJECT')
         os.environ['ATLAS_PROJECT'] = str(cls.project)
+        os.environ['HERMES_HOME'] = str(cls.project / 'hermes-home')
         spec = importlib.util.spec_from_file_location('atlas_backend_test', APP / 'backend.py')
         cls.backend = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cls.backend)
@@ -118,29 +119,6 @@ class AtlasTests(unittest.TestCase):
             self.assertIn('german-required', self.backend.CACHE['jobs'][0]['flags'])
             self.assertIn('fluent German', self.backend.public_state()['jobs'][0]['text'])
 
-    def test_briefs_use_fresh_tool_free_hermes_and_chat_keeps_its_tools(self):
-        brief = self.backend.hermes_arguments('brief')
-        self.assertEqual(brief[brief.index('--model')+1], 'atlas-local')
-        self.assertEqual(brief[brief.index('--reasoning')+1], 'none')
-        self.assertEqual(brief[brief.index('--toolsets')+1], 'none')
-        self.assertEqual(brief[brief.index('--max-turns')+1], '1')
-        self.assertNotIn('--continue', brief)
-        self.assertNotIn('--resume', brief)
-        chat = self.backend.hermes_arguments('chat')
-        self.assertNotIn('--continue', chat)
-        self.assertNotIn('--resume', chat)
-        self.assertEqual(chat[chat.index('--toolsets')+1], 'terminal,skills,memory,web')
-
-    def test_recent_chat_is_bounded_and_omits_failed_and_brief_messages(self):
-        rows = [{'id':'old', 'role':'user', 'text':'a' * 6000},
-                {'id':'b', 'role':'assistant', 'text':'A long brief', 'kind':'brief'},
-                {'id':'a', 'role':'user', 'text':'Call me Alex'},
-                {'id':'e', 'role':'assistant', 'text':'Failure', 'status':'error'},
-                {'id':'u', 'role':'user', 'text':'What is my name?'},
-                {'id':'current', 'role':'assistant', 'text':''}]
-        with patch.dict(self.backend.DATA, {'chat':rows}):
-            self.assertEqual(self.backend.recent_chat('current'), [{'role':'user', 'text':'Call me Alex'}])
-
     def test_brief_keeps_english_source_facts_and_renders_real_list_items(self):
         rows = [{'title':'Russia targets Ukraine’s electricity supply', 'language':'en', 'source':'Publisher', 'url':'https://publisher.example/news'}]
         result = self.backend.attach_brief_links('Europe:\n• Starlink restrictions [news-0]', rows)
@@ -168,16 +146,13 @@ class AtlasTests(unittest.TestCase):
     def test_background_translation_leaves_chat_available_and_saves_only_one_batch(self):
         import io
         titles = [f'Neue Ausstellung Nummer {i}' for i in range(5)]
-        response = io.BytesIO(json.dumps({'choices':[{'message':{'content':json.dumps({'titles':['New exhibition 0','New exhibition 1','New exhibition 2']})}}]}).encode())
-        key = self.project / 'test-background.key'
-        key.write_text('test-key')
         finished = threading.Event()
         save = self.backend.gl.save_json
         def capture_save(path, value):
             save(path, value)
             if path.name == 'news_translations.json':
                 finished.set()
-        with patch.dict(self.backend.CACHE, {'news':[{'title':t, 'lang':'de'} for t in titles]}), patch.object(self.backend, 'model_health', return_value=True), patch.object(self.backend, 'MODEL_KEY_FILE', key), patch.object(self.backend.urllib.request, 'urlopen', return_value=response) as call, patch.object(self.backend.gl, 'save_json', side_effect=capture_save):
+        with patch.dict(self.backend.CACHE, {'news':[{'title':t, 'lang':'de'} for t in titles]}), patch.object(self.backend, 'model_health', return_value=True), patch.object(self.backend.hermes_link, 'complete', return_value={'choices': [{'message': {'content': json.dumps({'titles': ['New exhibition 0','New exhibition 1','New exhibition 2']})}}]}) as call, patch.object(self.backend.gl, 'save_json', side_effect=capture_save):
             self.backend.translate_job_titles('news', background=True)
             self.assertFalse(self.backend.CHAT_LOCK.locked())
             self.assertTrue(finished.wait(3))
@@ -319,19 +294,16 @@ class AtlasTests(unittest.TestCase):
         import io
         title = 'Neue Ausstellung im Stadtmuseum eröffnet'
         self.backend.CACHE['news'] = [{'title': title, 'lang': 'de'}]
-        response = io.BytesIO(json.dumps({'choices': [{'message': {'content': json.dumps({'titles': ['New exhibition opens at the city museum']})}}]}).encode())
-        key = self.project / 'test-news-model.key'
-        key.write_text('test-key')
         finished = threading.Event()
         save = self.backend.gl.save_json
         def capture_save(path, data):
             save(path, data)
             if path.name == 'news_translations.json':
                 finished.set()
-        with patch.object(self.backend, 'model_health', return_value=True), patch.object(self.backend, 'MODEL_KEY_FILE', key), patch.object(self.backend.urllib.request, 'urlopen', return_value=response) as call, patch.object(self.backend.gl, 'save_json', side_effect=capture_save), patch.object(self.backend, 'start_model') as start:
+        with patch.object(self.backend, 'model_health', return_value=True), patch.object(self.backend.hermes_link, 'complete', return_value={'choices': [{'message': {'content': json.dumps({'titles': ['New exhibition opens at the city museum']})}}]}) as call, patch.object(self.backend.gl, 'save_json', side_effect=capture_save), patch.object(self.backend, 'start_model') as start:
             self.backend.translate_job_titles('news')
             self.assertTrue(finished.wait(3))
-            self.assertEqual(call.call_args.args[0].full_url, self.backend.MODEL_URL + '/v1/chat/completions')
+            self.assertEqual(call.call_args.args[0], self.backend.MODEL_ID)
             start.assert_not_called()
         self.assertEqual(json.loads((self.project / 'state/news_translations.json').read_text())[title], 'New exhibition opens at the city museum')
         self.assertNotIn(title, self.backend.TRANSLATIONS)
@@ -339,55 +311,67 @@ class AtlasTests(unittest.TestCase):
     def test_translation_worker_saves_local_model_result_by_original_title(self):
         title = 'Werkstudent für Nachhaltigkeitsforschung'
         self.backend.CACHE['jobs'] = [{'title': title, 'where': 'Trier'}]
-        import io
-        response = io.BytesIO(json.dumps({'choices': [{'message': {'content': json.dumps({'titles': ['Working student in sustainability research']})}}]}).encode())
-        key = self.project / 'test-model.key'
-        key.write_text('test-key')
         finished = threading.Event()
         save = self.backend.gl.save_json
         def capture_save(path, data):
             save(path, data)
             if path.name == 'job_translations.json':
                 finished.set()
-        with patch.object(self.backend, 'model_health', return_value=True), patch.object(self.backend, 'MODEL_KEY_FILE', key), patch.object(self.backend.urllib.request, 'urlopen', return_value=response) as call, patch.object(self.backend.gl, 'save_json', side_effect=capture_save):
+        with patch.object(self.backend, 'model_health', return_value=True), patch.object(self.backend.hermes_link, 'complete', return_value={'choices': [{'message': {'content': json.dumps({'titles': ['Working student in sustainability research']})}}]}) as call, patch.object(self.backend.gl, 'save_json', side_effect=capture_save):
             self.backend.translate_job_titles()
             self.assertTrue(finished.wait(3))
-            self.assertEqual(call.call_args.args[0].full_url, self.backend.MODEL_URL + '/v1/chat/completions')
+            self.assertEqual(call.call_args.args[0], self.backend.MODEL_ID)
         self.assertEqual(self.backend.TRANSLATIONS[title], 'Working student in sustainability research')
 
-    def test_stopping_model_persists_pause_across_app_restarts(self):
-        with patch.object(self.backend, 'terminate_owned_process'):
-            self.post('/api/model/stop', {})
-        self.assertFalse(self.backend.DATA['settings']['model_autostart'])
-        saved = json.loads(self.backend.STORE.read_text())
-        self.assertFalse(saved['settings']['model_autostart'])
-
-    def test_stop_terminates_busy_agent_and_model_without_waiting_for_chat_lock(self):
-        agent = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'], start_new_session=True)
-        model = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'], start_new_session=True)
+    def test_stop_cancels_the_hermes_run_and_unloads_gemma_without_waiting_for_chat_lock(self):
         self.backend.CHAT_LOCK.acquire()
         try:
-            with patch.object(self.backend, 'CHAT_PROCESS', agent), patch.object(self.backend, 'MODEL_PROCESS', model):
+            with patch.object(self.backend, 'ACTIVE_RUN', 'run_busy'), patch.object(self.backend.hermes_link, 'stop_run') as stop_run, \
+                    patch.object(self.backend.hermes_link, 'unload') as unload:
                 self.post('/api/model/stop', {}).close()
-                self.assertIsNotNone(agent.poll())
-                self.assertIsNotNone(model.poll())
-                self.assertIsNone(self.backend.MODEL_PROCESS)
+                stop_run.assert_called_once_with('run_busy')
+                unload.assert_called_once_with(self.backend.MODEL_ID)
                 self.assertTrue(self.backend.CHAT_CANCEL.is_set())
-                self.assertFalse(self.backend.DATA['settings']['model_autostart'])
                 self.assertFalse(self.backend.MODEL_STOPPING.is_set())
         finally:
             self.backend.CHAT_LOCK.release()
-            for proc in (agent, model):
-                if proc.poll() is None:
-                    proc.kill()
-                proc.wait()
 
     def test_cancelled_startup_cannot_launch_or_reload_model(self):
         self.backend.CHAT_CANCEL.set()
-        with patch.object(self.backend.subprocess, 'Popen') as launch:
+        with patch.object(self.backend.GATEWAY, 'start') as start, patch.object(self.backend.hermes_link, 'load') as load:
             with self.assertRaisesRegex(RuntimeError, 'cancelled'):
                 self.backend.start_model(wait=True)
-            launch.assert_not_called()
+            start.assert_not_called()
+            load.assert_not_called()
+        self.backend.CHAT_CANCEL.clear()
+
+    def test_chat_turns_continue_one_hermes_session_and_stream_its_events(self):
+        events = [{'event': 'message.delta', 'text': 'Hel'}, {'event': 'tool.started', 'tool': 'web_search'},
+                  {'event': 'run.completed', 'output': 'Hello, Dhiraj.', 'usage': {'total_tokens': 9}}]
+        session = self.backend.DATA['settings']['hermes_session']
+        with patch.object(self.backend, 'start_model'), patch.object(self.backend.hermes_link, 'create_run', return_value='run_1') as create, \
+                patch.object(self.backend.hermes_link, 'run_events', side_effect=lambda run: iter(events)):
+            for text in ('Hi', 'Again'):
+                self.backend.CHAT_LOCK.acquire()
+                self.backend.DATA['chat'].append({'id': text, 'role': 'assistant', 'text': '', 'status': 'loading', 'tools': []})
+                self.backend.chat_worker(text, text, 'chat')
+                row = self.backend.DATA['chat'][-1]
+                self.assertEqual((row['status'], row['text'], row['tools']), ('done', 'Hello, Dhiraj.', ['web_search']))
+        self.assertEqual([call.kwargs['session_id'] for call in create.call_args_list], [session, session])
+        self.assertEqual(create.call_args.kwargs['model'], self.backend.MODEL_ID)
+
+    def test_gemma_unloads_after_five_idle_minutes_but_not_during_a_routine(self):
+        now = 10_000.0
+        with patch.object(self.backend, 'model_health', return_value=True), patch.object(self.backend.hermes_link, 'unload') as unload, \
+                patch.object(self.backend.hermes_link, 'busy', return_value=True):
+            self.backend.ACTIVITY['at'] = now - 299
+            self.assertFalse(self.backend.idle_unload(now))
+            self.backend.ACTIVITY['at'] = now - 301
+            self.assertFalse(self.backend.idle_unload(now))  # a routine is generating: that counts as use
+            self.assertEqual(self.backend.ACTIVITY['at'], now)
+            with patch.object(self.backend.hermes_link, 'busy', return_value=False):
+                self.assertTrue(self.backend.idle_unload(now + 301))
+        unload.assert_called_once_with(self.backend.MODEL_ID)
 
 
 if __name__ == '__main__':

@@ -23,7 +23,16 @@ Hermes Desktop app for Apple Silicon Macs uses the same setup: `hermes desktop`.
 
 ## 2. Choose the model (LLM)
 
-Easiest is **OpenRouter** (one account, many models):
+**Local and private (what Atlas uses):** Gemma 4 12B on your Mac, run by Hermes.
+
+1. Download and verify Gemma (7.1 GB) into `~/.hermes/models/`:
+   `python3 ~/Projects/Atlas/app/install_model.py`
+2. Run `hermes model` → **Local models**. Install the llama.cpp engine when asked, then choose
+   **Gemma-4-12B-Q4_K_M** as the default model, so routines use it too.
+3. Install the gateway as a background service once: `hermes gateway install`. From then on
+   Atlas starts and stops it (**Settings → Local model**); select **Connect to Hermes** there once.
+
+**Cloud alternative:** **OpenRouter** (one account, many models):
 
 1. Create an account at openrouter.ai, add a small amount of credit, and **set a monthly
    spending limit** on your API key.
@@ -38,7 +47,7 @@ Alternatively `hermes setup --portal` uses a Nous Portal subscription, which als
 2. Message **@userinfobot** to get your numeric **user ID**.
 3. Run `hermes gateway setup`, choose Telegram, and paste the token and your user ID. Your ID
    goes in the allowlist (`TELEGRAM_ALLOWED_USERS`), so **only you** can talk to the bot.
-4. Start the gateway as a background service that survives reboots:
+4. If you didn't already in step 2, install the gateway as a background service:
 
    ```bash
    hermes gateway install
@@ -65,10 +74,9 @@ backend they run in a container that can only see this project folder.
    `~/.hermes/config.yaml` under `terminal:` (`open -e ~/.hermes/config.yaml`), then run
    `hermes gateway restart`. The agent sees only the scripts, config, your profile (read-only) and `data/`; `state/`, with your chats and saved API keys, stays out of its reach.
 
-For Atlas’s local Gemma server, keep `model.context_length` unset for auto-detection,
-or set it to `65536`. Check with `hermes config get model.context_length`; after
-changing it, restart the gateway. Restart Gemma from Atlas Settings after changing
-the app’s model context.
+Hermes sizes Gemma's context itself (at least 64K), so keep `model.context_length` unset.
+Check with `hermes config get model.context_length`; if you set it earlier, remove it and
+restart the gateway (Atlas → Settings → Local model → Stop Hermes, then Start Hermes).
 
 Skipping Docker for now is fine. Run `./install.sh local` in the next step instead, and leave
 Hermes' approval prompts on (`approvals.mode: smart`, the default).
