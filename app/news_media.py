@@ -193,9 +193,13 @@ class NewsMedia:
         self.google_lock = threading.Lock()
         self.google_last_request, self.google_backoff = 0, 0
         self.status = {'running': False, 'completed': 0, 'total': 0}
+        # The UI asks for the same list on every poll; recompute only when the index changes.
+        self.version, self._memo = 0, (None, -1, [])
 
     def enrich(self, items):
         with self.lock:
+            if self._memo[0] is items and self._memo[1] == self.version:
+                return self._memo[2], self.status.copy()
             enriched = []
             for item in items:
                 row = self.index.get(item.get('url', ''), {})
@@ -205,6 +209,7 @@ class NewsMedia:
                     picture = {'url': '/api/news/images/' + key, 'alt': row.get('alt', ''),
                                'credit': row.get('credit', ''), 'source_url': row.get('source_url', item.get('url', ''))}
                 enriched.append({**item, **({'article_url': row['article_url']} if row.get('article_url') else {}), 'picture': picture})
+            self._memo = (items, self.version, enriched)
             return enriched, self.status.copy()
 
     def image(self, key):
@@ -260,7 +265,7 @@ class NewsMedia:
         except (OSError, ValueError, http.client.HTTPException):
             return result
 
-    def start(self, items):
+    def start(self, items, keep_urls=None):
         with self.lock:
             if self.status['running']:
                 return
@@ -286,10 +291,21 @@ class NewsMedia:
                         except Exception:
                             result = {}
                         with self.lock:
+                            previous = self.index.get(item['url'], {})
+                            if not result.get('key') and previous.get('key') and (self.folder / previous['key']).is_file():
+                                # A failed re-check (network error, 429) keeps the photo already cached.
+                                result = {**{k: previous[k] for k in ('key', 'mime', 'alt', 'credit', 'source_url', 'article_url') if k in previous}, **result}
                             self.index[item['url']] = {**result, 'checked_at': time.time(), 'feed_image': item.get('image'), 'resolver_version': 2}
                             self.status['completed'] += 1
+                            self.version += 1
                 with self.lock:
-                    self.index = dict(sorted(self.index.items(), key=lambda pair: pair[1].get('checked_at', 0), reverse=True)[:160])
+                    # Keep every story the app still shows (News holds 14 days), within a disk bound.
+                    rows = sorted(self.index.items(), key=lambda pair: pair[1].get('checked_at', 0), reverse=True)
+                    if keep_urls is not None:
+                        keep_set = set(keep_urls)
+                        rows = [pair for pair in rows if pair[0] in keep_set]
+                    self.index = dict(rows[:1000])
+                    self.version += 1
                     keep = {row.get('key') for row in self.index.values()}
                     for path in self.folder.iterdir():
                         if path.name not in keep:

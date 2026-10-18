@@ -162,7 +162,7 @@ def event_rows(rows, today):
 
 
 def upcoming(rows, today):
-    unique = {}
+    unique, by_url = {}, {}
     def identity(row):
         parsed = urllib.parse.urlsplit(row.get('url',''))
         return (str(parsed.hostname).removeprefix('www.'),parsed.path.rstrip('/'),row.get('start'))
@@ -179,7 +179,7 @@ def upcoming(rows, today):
         key = (re.sub(r'\W', '', re.sub(r'\b20\d\d\b', '', row['title'].casefold())), row['start'])
         parsed = urllib.parse.urlsplit(row['url'])
         url_key = (parsed.hostname.removeprefix('www.'),parsed.path.rstrip('/'),row['start'])
-        existing_key = next((k for k,v in unique.items() if v.get('_url_key') == url_key), key)
+        existing_key = by_url.setdefault(url_key, key)
         old = unique.get(existing_key)
         item = {**row, 'location': None if row.get('online') else row.get('location') or city_location(row.get('city'), row.get('country', 'Germany')),
                 'stale': (today - checked).days > 14, 'ongoing': start <= today <= end, '_url_key':url_key}
@@ -198,16 +198,27 @@ def upcoming(rows, today):
     return sorted(unique.values(), key=lambda r: (r['start'], r['title']))
 
 
+_PUBLIC = {'key': None, 'value': None}
+
+
 def public_state(state_dir, today):
-    cached = gl.load_json(state_dir / 'tech.json', {})
-    events = upcoming([*cached.get('events', []), *CATALOG['events']], today)
-    bases = {city: {'city':city, **place} for city, place in discovery.PLACES.items()}
-    bases.update({row['city']:{'city':row['city'], **row['location']} for row in events if row.get('location')})
-    return {'events': events,
+    # Rebuilt only when tech.json changes or the day turns; the UI asks on every poll.
+    path = state_dir / 'tech.json'
+    try:
+        key = (path.stat().st_mtime_ns, today)
+    except OSError:
+        key = (None, today)
+    if _PUBLIC['key'] != key:
+        cached = gl.load_json(path, {})
+        events = upcoming([*cached.get('events', []), *CATALOG['events']], today)
+        bases = {city: {'city':city, **place} for city, place in discovery.PLACES.items()}
+        bases.update({row['city']:{'city':row['city'], **row['location']} for row in events if row.get('location')})
+        _PUBLIC.update(key=key, value={'events': events,
             'posts': cached.get('posts', []), 'sources': cached.get('sources', []),
             'calendars': CATALOG['calendars'], 'checked_at': CATALOG['checked_at'],
             'bases': sorted(bases.values(), key=lambda p:p['city']),
-            'refreshed_at': cached.get('refreshed_at'), **STATUS}
+            'refreshed_at': cached.get('refreshed_at')})
+    return {**_PUBLIC['value'], **STATUS}
 
 
 def fetch_event_source(name, today):

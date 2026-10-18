@@ -88,27 +88,28 @@ def load(job, state_dir):
     path = state_dir / "job_details.json"
     key = hashlib.sha256(f"{job['source']}:{job['source_id']}:{job['url']}".encode()).hexdigest()
     with LOCK, gl.file_lock(path):
+        cached = gl.load_json(path, {}).get(key, {})
+    if time.time() - cached.get("at", 0) < (7 * 86400 if cached.get("text") else 900):
+        return {k: v for k, v in cached.items() if k != "at"}
+    # Fetch without holding the locks, so other listings (and cache hits) are not kept waiting.
+    text, source = "", ""
+    if job["source"] == "Bundesagentur":
+        try:
+            text = job_providers.bundesagentur_description(job["source_id"])
+            source = "Bundesagentur job details"
+        except Exception:
+            pass
+    if not text:
+        try:
+            body, _, _ = news_media.fetch_public(job["url"], 1024 * 1024)
+            text, source = posting_text(body.decode("utf-8", errors="replace"))
+        except Exception:
+            pass
+    result = {"text": text, "detail_source": source if text else "",
+              "detail_error": "" if text else "The source did not provide readable details. Open the original listing for requirements."}
+    with LOCK, gl.file_lock(path):
         now = time.time()
-        cache = gl.load_json(path, {})
-        cached = cache.get(key, {})
-        if now - cached.get("at", 0) < (7 * 86400 if cached.get("text") else 900):
-            return {k: v for k, v in cached.items() if k != "at"}
-        text, source = "", ""
-        if job["source"] == "Bundesagentur":
-            try:
-                text = job_providers.bundesagentur_description(job["source_id"])
-                source = "Bundesagentur job details"
-            except Exception:
-                pass
-        if not text:
-            try:
-                body, _, _ = news_media.fetch_public(job["url"], 1024 * 1024)
-                text, source = posting_text(body.decode("utf-8", errors="replace"))
-            except Exception:
-                pass
-        result = {"text": text, "detail_source": source if text else "",
-                  "detail_error": "" if text else "The source did not provide readable details. Open the original listing for requirements."}
-        cache = {k: v for k, v in cache.items() if now - v.get("at", 0) < 7 * 86400}
+        cache = {k: v for k, v in gl.load_json(path, {}).items() if now - v.get("at", 0) < 7 * 86400}
         cache[key] = {**result, "at": now}
         gl.save_json(path, dict(sorted(cache.items(), key=lambda row: row[1]["at"], reverse=True)[:500]))
         return result

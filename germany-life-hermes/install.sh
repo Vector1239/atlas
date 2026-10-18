@@ -62,8 +62,15 @@ Docker sandbox: make sure ~/.hermes/config.yaml has these mounts under terminal:
   terminal:
     backend: docker
     docker_volumes:
-      - "$HERE:/workspace/germany-life:ro"
+      - "$HERE/gl:/workspace/germany-life/gl:ro"
+      - "$HERE/scripts:/workspace/germany-life/scripts:ro"
+      - "$HERE/config:/workspace/germany-life/config:ro"
+      - "$HERE/profile.md:/workspace/germany-life/profile.md:ro"
       - "$HERE/data:/workspace/germany-life/data"
+
+state/ (chat history, saved API keys) is deliberately not mounted: with web tools on,
+nothing the agent can read should be worth stealing. Replace any older
+"$HERE:/workspace/germany-life:ro" line with the ones above.
 
 Then restart the gateway: hermes gateway restart
 EOF

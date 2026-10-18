@@ -93,6 +93,7 @@ UPDATES = updater.Updater(PROJECT.parent, Path(__file__).parent, os.environ.get(
 _CONFIG = {"mtime": None, "value": {}}
 _HEALTH = {"at": 0.0, "ok": False}
 _ENRICHED = {"source": None, "translations": -1, "jobs": []}
+_NEWS = {"source": None, "translations": -1, "items": []}
 
 
 def persist():
@@ -325,7 +326,9 @@ def refresh_data(include_jsearch=False):
             CACHE["news"] = news_store.merge_news(CACHE.get('news', []), unique, gl.now(cfg))
             CACHE.update(weather=weather, mensa=mensa, sources=sources, refreshed_at=iso_now())
             gl.save_json(SNAPSHOT, CACHE)
-        NEWS_MEDIA.start(unique)
+        with LOCK:
+            shown = [item.get('url') for item in CACHE.get('news', [])]
+        NEWS_MEDIA.start(unique, keep_urls=shown)
         REFRESH_STATUS["message"] = "Finding jobs in Trier and the region…"
         matcher = job_scan.Matcher(cfg.get("jobs", {}))
         status = []
@@ -336,7 +339,7 @@ def refresh_data(include_jsearch=False):
         cutoff = (gl.now(cfg).date() - dt.timedelta(days=cfg.get('jobs', {}).get('max_age_days', 14))).isoformat()
         with LOCK:
             jobs += [dict(job) for job in CACHE.get('jobs', []) if job.get('source') == 'JSearch'
-                     and (not job.get('posted') or job['posted'][:10] >= cutoff)]
+                     and job.get('posted') and job['posted'][:10] >= cutoff]
         found, seen = [], set()
         for job in sorted(jobs, key=lambda item: item["ring"]):
             key = f"{gl.norm(job['title'])}|{gl.norm(job['company'])}"
@@ -404,6 +407,13 @@ def enriched_jobs(jobs):
     return _ENRICHED["jobs"]
 
 
+def enriched_news(news):
+    if _NEWS["source"] is not news or _NEWS["translations"] != len(NEWS_TRANSLATIONS):
+        _NEWS.update(source=news, translations=len(NEWS_TRANSLATIONS),
+                     items=[discovery.enrich_news(item, NEWS_TRANSLATIONS) for item in news])
+    return _NEWS["items"]
+
+
 def public_state():
     with LOCK:
         result = dict(CACHE)
@@ -413,8 +423,7 @@ def public_state():
         jobs = CACHE.get("jobs", [])
     today = gl.now(config()).date()
     result["jobs"] = enriched_jobs(jobs)
-    result["news"] = [discovery.enrich_news(item, NEWS_TRANSLATIONS) for item in result.get("news", [])]
-    result["news"], result["news_media"] = NEWS_MEDIA.enrich(result["news"])
+    result["news"], result["news_media"] = NEWS_MEDIA.enrich(enriched_news(result.get("news", [])))
     result["events"] = discovery.upcoming_events(today)
     result['tech'] = tech.public_state(STATE_DIR, today)
     result['capabilities'] = {'web_search': True, 'web_extract': True, 'note': 'Hermes web tools enabled; searches contact external websites.'}
@@ -546,7 +555,7 @@ def hermes_arguments(kind):
 
 
 def brief_news():
-    rows, _ = NEWS_MEDIA.enrich([discovery.enrich_news(item, NEWS_TRANSLATIONS) for item in CACHE.get("news", [])])
+    rows, _ = NEWS_MEDIA.enrich(enriched_news(CACHE.get("news", [])))
     selected, seen = [], set()
     for ring in range(4):
         for item in [row for row in rows if row.get("ring", 0) == ring][:4]:
@@ -603,7 +612,12 @@ def attach_brief_links(text, news):
                     original_line = f'- [{title}][news-{index}] · {source}'
                 sections.append(original_line)
             sections.append('')
-        text = '\n'.join(lines[:min(headers)] + sections + lines[max(i for i, _ in references) + 1:])
+        start, end = min(headers), max(i for i, _ in references)
+        replaced = set(headers) | {i for i, _ in references}
+        # Lines such as Deadlines or Mensa between the regions are kept, after the regenerated news.
+        kept = [lines[i] for i in range(start, end + 1) if i not in replaced and lines[i].strip()]
+        prefix = [line for i, line in enumerate(lines[:start]) if i not in replaced]
+        text = '\n'.join(prefix + sections + kept + ([''] if kept else []) + lines[end + 1:])
     text = re.sub(r'(?<!\])\[(news-\d+)\](?!:)', r'[Source][\1]', text)
     used = set(re.findall(r'\[(news-\d+)\]', text))
     definitions = [f"[news-{index}]: <{item['url']}>" for index, item in enumerate(news) if f"news-{index}" in used]
@@ -969,7 +983,7 @@ def maintenance():
         if (not UPDATES.status()['running'] and not CHAT_LOCK.locked() and not TRANSLATION_STATUS['running']
                 and (CRON_PROCESS is None or CRON_PROCESS.poll() is not None)
                 and time.time() - last_translation > (180 if TRANSLATION_STATUS['error'] else 15)
-                and any(discovery.enrich_news(item, NEWS_TRANSLATIONS)['translation_needed'] for item in CACHE.get('news', []))
+                and any(item['translation_needed'] for item in enriched_news(CACHE.get('news', [])))
                 and model_health()):
             last_translation = time.time()
             try:

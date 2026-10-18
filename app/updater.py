@@ -38,6 +38,8 @@ def read_json(path, default):
 
 def alive(pid):
     try:
+        if int(pid) <= 0:
+            return False  # kill(0, 0) would test our own process group, not a worker
         os.kill(int(pid), 0)
         return True
     except (OSError, ValueError, TypeError):
@@ -61,7 +63,9 @@ class Updater:
 
     def status(self):
         value = read_json(self.status_file, {"phase": "idle", "message": "Check for updates from GitHub main."})
-        if value.get("phase") in BUSY and not alive(value.get("worker_pid")):
+        # A just-launched helper has no PID yet (worker_pid 0); give it a moment to record one.
+        starting = value.get("worker_pid") == 0 and time.time() - value.get("launched_at", 0) < 30
+        if value.get("phase") in BUSY and not starting and not alive(value.get("worker_pid")):
             value.update(phase="error", message="The update was interrupted. Check for updates to try again.")
         return {**value, "installed_revision": self.revision, "installed_version": self.version,
                 "supported": sys.platform == "darwin" and self.bundle is not None,
@@ -87,10 +91,13 @@ class Updater:
             # Copy the helper so replacing the app cannot remove its running code.
             helper = self.state_dir / "atlas_update_worker.py"
             shutil.copy2(Path(__file__), helper)
+            # Not the backend's PID: the helper records its own as soon as it starts.
             self.write("checking" if action == "check" else "preparing",
-                       "Checking GitHub…" if action == "check" else "Preparing the update…", error="")
+                       "Checking GitHub…" if action == "check" else "Preparing the update…", error="",
+                       worker_pid=0, launched_at=time.time())
             command = [sys.executable, "-u", str(helper), action, "--root", str(self.root),
                        "--resources", str(self.resources), "--bundle", str(self.bundle),
+                       "--state-dir", str(self.state_dir),
                        "--desktop-pid", str(self.desktop_pid or 0), "--backend-pid", str(self.backend_pid or 0)]
             try:
                 with self.log_file.open("a") as log:
@@ -278,13 +285,23 @@ def main():
         parser.add_argument(f"--{name}", required=True)
     parser.add_argument("--desktop-pid", type=int, default=0)
     parser.add_argument("--backend-pid", type=int, default=0)
+    parser.add_argument("--state-dir")
     args = parser.parse_args()
-    updater = Updater(args.root, args.resources, args.bundle, args.desktop_pid, args.backend_pid)
+    updater = Updater(args.root, args.resources, args.bundle, args.desktop_pid, args.backend_pid, state_dir=args.state_dir)
+    current = read_json(updater.status_file, {})
+    updater.write(current.get("phase", "checking"), current.get("message", "Checking GitHub…"))  # record our PID
     with (updater.state_dir / "atlas-update.lock").open("a") as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            return
+        # A previous helper may still be cleaning up after an install; wait for it.
+        deadline = time.monotonic() + 600
+        while True:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() > deadline:
+                    updater.write("error", "A previous update is still finishing. Try again in a minute.", error="busy")
+                    return
+                time.sleep(1)
         try:
             updater.check() if args.action == "check" else updater.install()
         except Exception as exc:

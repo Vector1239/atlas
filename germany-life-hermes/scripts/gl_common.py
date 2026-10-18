@@ -16,6 +16,7 @@ import os
 import re
 import ssl
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -47,7 +48,12 @@ def data_dir() -> Path:
 
 def state_dir() -> Path:
     path = project_home() / "state"
-    path.mkdir(parents=True, exist_ok=True)
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        # Inside the agent sandbox state/ is not mounted: use a throwaway folder instead.
+        path = Path(tempfile.gettempdir()) / "germany-life-state"
+        path.mkdir(parents=True, exist_ok=True)
     return path
 
 
