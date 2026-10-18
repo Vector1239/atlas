@@ -2,15 +2,31 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;background:#f7f6f3;user-select:none}
 button,input{font:inherit;color:inherit}
-.bar{height:43px;display:flex;align-items:center;gap:10px;padding:0 12px 0 84px;border-bottom:1px solid var(--line);-webkit-app-region:drag}
-.bar>*{-webkit-app-region:no-drag}
-.nav{display:flex;gap:2px}
 button{border:0;background:none;cursor:pointer;border-radius:6px;display:flex;align-items:center;gap:6px}
 button:disabled{opacity:.35;cursor:default}
-button:hover:not(:disabled){background:#e9eae4}
 button:focus-visible,input:focus-visible{outline:2px solid #748c6f;outline-offset:1px}
-.nav button{width:30px;height:28px;justify-content:center}
 svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:20;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+[hidden]{display:none!important}
+.strip{height:40px;display:flex;align-items:flex-end;gap:2px;padding:0 10px 0 84px;border-bottom:1px solid var(--line);-webkit-app-region:drag;overflow:hidden}
+.tab{-webkit-app-region:no-drag;position:relative;display:flex;align-items:center;flex:0 1 200px;min-width:64px;height:32px;padding:0 4px 0 10px;border-radius:8px 8px 0 0;color:#72756e;font-size:12px}
+.tab:hover{background:#efeee9}
+.tab.selected{background:#fbfbfa;color:#30372f;font-weight:600;box-shadow:0 0 0 1px var(--line);clip-path:inset(-1px -1px 0 -1px)}
+.tab.selected::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;background:#fbfbfa}
+.tab-label{flex:1;min-width:0;height:100%;gap:7px;padding:0;border-radius:0}
+.tab-label:hover:not(:disabled){background:none}
+.tab-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mark{width:9px;height:9px;border-radius:50%;background:#ced1c4;flex-shrink:0}
+.mark.atlas{width:16px;height:16px;border-radius:4px;background:#30372f;color:#fff;font:italic 600 11px Georgia,serif;display:grid;place-items:center;padding-right:1px}
+.tab.loading .mark{background:none;border:2px solid #ced1c4;border-top-color:var(--green);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.tab-close{width:20px;height:20px;justify-content:center;opacity:0;flex-shrink:0}
+.tab:hover .tab-close,.tab.selected .tab-close{opacity:.7}
+.tab-close:hover{background:#e3e5dc;opacity:1}
+.tab-close svg{width:10px;height:10px;stroke-width:24}
+.toolbar{position:relative;height:40px;display:flex;align-items:center;gap:8px;padding:0 10px;background:#fbfbfa;border-bottom:1px solid var(--line)}
+.nav{display:flex;gap:2px}
+.nav button{width:30px;height:28px;justify-content:center}
+.nav button:hover:not(:disabled),.action:hover:not(:disabled){background:#e9eae4}
 .stop,.loading .reload{display:none}
 .loading .stop{display:block}
 .address{flex:1;min-width:0;height:28px;display:flex;align-items:center;gap:7px;padding:0 10px;background:#fff;border:1px solid var(--line);border-radius:7px}
@@ -18,11 +34,14 @@ svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:20;stroke-
 .lock{width:12px;height:12px;color:var(--green)}
 .lock.insecure{color:#a46a3b}
 input{flex:1;min-width:0;border:0;outline:none;background:none;font-size:12.5px;padding:0;user-select:text}
-.title{max-width:40%;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.title:empty{display:none}
-.external{height:28px;padding:0 9px;font-size:12px;color:#4f544c;white-space:nowrap}
-.progress{position:fixed;left:0;bottom:0;height:2px;width:0;background:var(--green);opacity:0}
+.note{max-width:45%;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.note:empty{display:none}
+.note.failure{color:#a46a3b}
+.action{height:28px;padding:0 9px;font-size:12px;color:#4f544c;white-space:nowrap}
+.action.suggested{color:var(--green);background:#edf3ec}
+.action.on{color:#fff;background:var(--green)}
+.action.on:hover:not(:disabled){background:#3f573d}
+.progress{position:absolute;left:0;bottom:-1px;height:2px;width:0;background:var(--green);opacity:0}
 .progress.active{opacity:1;animation:load 2.4s ease-out forwards}
 @keyframes load{from{width:0}to{width:85%}}
-@media (max-width:700px){.external span,.title{display:none}}
-.title.failure{color:#a46a3b;max-width:55%}
+@media (max-width:760px){.action span,.note{display:none}}

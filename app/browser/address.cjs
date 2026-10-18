@@ -22,4 +22,37 @@ function chromeUserAgent(agent) {
   return String(agent || '').replace(/ \(\+https?:[^)]*\)/g, '').replace(/ (Electron|Atlas|atlas-local)\/\S+/g, '');
 }
 
-module.exports = { isWeb, addressURL, chromeUserAgent };
+// Page translation goes through Google Translate's website proxy: www.trier.de becomes
+// www-trier-de.translate.goog, which serves the page translated and keeps its links translated.
+const PROXY = '.translate.goog';
+
+function isTranslated(url) {
+  try { return new URL(url).hostname.endsWith(PROXY); } catch { return false; }
+}
+
+function translatedURL(url, language = 'en') {
+  if (!isWeb(url) || isTranslated(url)) return url;
+  const original = new URL(url);
+  const proxied = new URL(original.href);
+  proxied.protocol = 'https:';
+  proxied.port = '';
+  proxied.hostname = original.hostname.replaceAll('-', '--').replaceAll('.', '-') + PROXY;
+  proxied.searchParams.set('_x_tr_sl', 'auto');
+  proxied.searchParams.set('_x_tr_tl', language);
+  proxied.searchParams.set('_x_tr_hl', language);
+  if (original.protocol === 'http:') proxied.searchParams.set('_x_tr_sch', 'http');
+  return proxied.href;
+}
+
+function originalURL(url) {
+  if (!isTranslated(url)) return url;
+  const proxied = new URL(url);
+  const original = new URL(proxied.href);
+  const host = proxied.hostname.slice(0, -PROXY.length);
+  original.hostname = host.replaceAll('--', '\0').replaceAll('-', '.').replaceAll('\0', '-');
+  original.protocol = proxied.searchParams.get('_x_tr_sch') === 'http' ? 'http:' : 'https:';
+  for (const key of [...original.searchParams.keys()]) if (key.startsWith('_x_tr_')) original.searchParams.delete(key);
+  return original.href;
+}
+
+module.exports = { isWeb, addressURL, chromeUserAgent, isTranslated, translatedURL, originalURL };
