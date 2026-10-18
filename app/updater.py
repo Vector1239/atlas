@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import plistlib
+import re
 import shlex
 import shutil
 import signal
@@ -21,6 +22,11 @@ import urllib.request
 
 REPOSITORY = "Vector1239/atlas"
 BUSY = {"checking", "preparing", "building", "installing", "restarting"}
+
+
+def version_number(value):
+    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", str(value))
+    return tuple(map(int, match.groups())) if match else None
 
 
 def read_json(path, default):
@@ -57,7 +63,8 @@ class Updater:
         value = read_json(self.status_file, {"phase": "idle", "message": "Check for updates from GitHub main."})
         if value.get("phase") in BUSY and not alive(value.get("worker_pid")):
             value.update(phase="error", message="The update was interrupted. Check for updates to try again.")
-        return {**value, "installed_revision": self.revision, "supported": sys.platform == "darwin" and self.bundle is not None,
+        return {**value, "installed_revision": self.revision, "installed_version": self.version,
+                "supported": sys.platform == "darwin" and self.bundle is not None,
                 "running": value.get("phase") in BUSY, "repository": REPOSITORY}
 
     def write(self, phase, message, **extra):
@@ -131,28 +138,26 @@ class Updater:
         target = self.git("rev-parse", "origin/main", capture=True)
         manifest = json.loads(self.git("show", f"{target}:app/package.json", capture=True))
         version = manifest["version"]
-        branch = self.git("branch", "--show-current", capture=True)
-        dirty = bool(self.git("status", "--porcelain", "--untracked-files=normal", capture=True))
         current = self.git("rev-parse", "HEAD", capture=True)
         available = target != self.revision
         if self.revision and self.ancestor(target, self.revision):
             available = False  # Do not replace a newer local build with an older main.
-        can_install = branch == "main" and not dirty and self.ancestor(current, target)
-        blocked = ""
-        if dirty:
-            blocked = "Commit or stash your local source changes before updating. Your work has not been changed."
-        elif branch != "main":
-            blocked = "Switch the Atlas checkout to main before updating."
-        elif not self.ancestor(current, target):
-            blocked = "Your local main has diverged from GitHub. Resolve it before updating."
+        installed_number, latest_number = version_number(self.version), version_number(version)
+        downgrade = installed_number is not None and latest_number is not None and latest_number < installed_number
+        if downgrade:
+            available = False
         return {"available": available, "latest_version": version, "latest_revision": target,
                 "installed_revision": self.revision, "checked_at": dt.datetime.now(dt.timezone.utc).isoformat(),
-                "can_install": can_install, "blocked_reason": blocked, "checkout_revision": current}
+                "can_install": available, "blocked_reason": "", "checkout_revision": current,
+                "remote_older": downgrade,
+                "source_note": "Your local source work will stay in place. The app update is built separately."}
 
     def check(self):
         self.write("checking", "Checking GitHub…", error="")
         info = self.inspect()
-        message = f"An update to Atlas {info['latest_version']} is available." if info["available"] else "Atlas is up to date."
+        message = (f"An update to Atlas {info['latest_version']} is available." if info["available"] else
+                   "This Mac has a newer version than GitHub main. No downgrade will be installed." if info["remote_older"] else
+                   "Atlas is up to date.")
         self.write("available" if info["available"] else "current", message, **info)
         return info
 
@@ -191,7 +196,7 @@ class Updater:
         self.write("preparing", "Checking the update before building…", error="")
         info = self.inspect()
         if not info["available"]:
-            self.write("current", "Atlas is up to date.", **info)
+            self.write("current", "This Mac has a newer version than GitHub main. No downgrade will be installed." if info["remote_older"] else "Atlas is up to date.", **info)
             return
         if not info["can_install"]:
             raise ValueError(info["blocked_reason"])
@@ -223,17 +228,15 @@ class Updater:
                 raise ValueError("The built app did not match the requested update.")
             self.run(["/usr/bin/codesign", "--force", "--deep", "--sign", "-", str(candidate)], timeout=120)
             self.run(["/usr/bin/codesign", "--verify", "--deep", "--strict", str(candidate)], timeout=60)
-            # Recheck before touching the checkout or closing the running app.
-            if self.git("rev-parse", "HEAD", capture=True) != info["checkout_revision"] or self.git("status", "--porcelain", capture=True):
-                raise ValueError("The source checkout changed during the build. Your work is preserved; check for updates again.")
+            # All runtime scripts travel with the release, independently of local edits.
+            if not (candidate / "Contents/Resources/app/runtime/scripts/gl_common.py").is_file():
+                raise ValueError("The update is missing its runtime scripts. Your installed app has not changed.")
             staging = Path(tempfile.mkdtemp(prefix=".atlas-update-", dir=self.bundle.parent))
             staged_app = staging / "Atlas.app"
             self.run(["/usr/bin/ditto", str(candidate), str(staged_app)], timeout=120)
             self.write("installing", "Installing the update. Atlas will restart shortly…")
-            # Fast-forward only: never reset, stash, clean, or overwrite user source changes.
-            self.git("merge", "--ff-only", target)
+            # The source checkout is for development. Never mutate it during app updates.
             self.activate(staged_app, staging / "previous.app", info)
-            self.run(["/bin/bash", str(self.root / "germany-life-hermes/install.sh"), "docker"], timeout=30)
             self.write("complete", "Atlas updated successfully.", available=False, can_install=False, error="")
         finally:
             if checkout.exists():

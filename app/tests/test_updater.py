@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 import plistlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -57,15 +58,49 @@ class UpdateTests(unittest.TestCase):
         self.updater.revision = self.latest
         self.assertFalse(self.updater.inspect()['available'])
 
-    def test_dirty_checkout_blocks_install_without_touching_local_edits(self):
+    def test_dirty_checkout_allows_isolated_build_without_touching_local_edits(self):
         manifest = self.root / 'app/package.json'
         manifest.write_text('{"version":"my local edits"}')
+        (self.root / 'untracked.txt').write_text('unfinished work')
         info = self.updater.inspect()
-        self.assertFalse(info['can_install'])
-        with self.assertRaisesRegex(ValueError, 'Commit or stash'):
-            self.updater.install()
+        self.assertTrue(info['can_install'])
+        self.assertEqual(info['blocked_reason'],'')
+        run = self.updater.run
+        def fail_build(args, **kwargs):
+            if Path(str(args[0])).name == 'npm':
+                raise RuntimeError('isolated build reached')
+            return run(args, **kwargs)
+        with patch.object(self.updater, 'run', side_effect=fail_build):
+            with self.assertRaisesRegex(RuntimeError, 'isolated build reached'):
+                self.updater.install()
         self.assertEqual(manifest.read_text(), '{"version":"my local edits"}')
+        self.assertEqual((self.root / 'untracked.txt').read_text(),'unfinished work')
         self.assertEqual(self.git('rev-parse', 'HEAD'), self.latest)
+
+    def test_older_release_is_not_offered_even_when_remote_commit_is_newer(self):
+        self.updater.version = '1.11.0'
+        info = self.updater.check()
+        self.assertTrue(info['remote_older'])
+        self.assertFalse(info['available'])
+        self.assertFalse(info['can_install'])
+        self.assertIn('No downgrade',self.updater.status()['message'])
+        with patch.object(self.updater,'run',wraps=self.updater.run) as run:
+            self.updater.install()
+        self.assertFalse(any('worktree' in call.args[0] for call in run.call_args_list))
+
+    def test_new_commit_of_same_version_is_still_available(self):
+        self.updater.version = '1.2.0'
+        self.assertTrue(self.updater.inspect()['available'])
+
+    def test_development_branch_and_unpushed_commits_do_not_block_app_updates(self):
+        self.git('checkout','-b','my-work')
+        (self.root / 'notes.txt').write_text('my branch')
+        self.git('add','notes.txt')
+        self.git('commit','-m','local work')
+        before = self.git('rev-parse','HEAD')
+        self.assertTrue(self.updater.inspect()['can_install'])
+        self.assertEqual(self.git('rev-parse','HEAD'),before)
+        self.assertEqual(self.git('branch','--show-current'),'my-work')
 
     def test_unexpected_remote_rejected(self):
         self.git('remote', 'set-url', 'origin', 'https://example.com/another/app.git')
@@ -88,6 +123,34 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual((self.resources / 'package.json').read_bytes(), before)
         self.assertEqual((data / 'worklog.csv').read_text(), 'personal shifts stay here')
         self.assertEqual(len(self.git('worktree', 'list', '--porcelain').split('worktree ')) - 1, 1)
+
+    def test_successful_install_keeps_dirty_source_and_builds_runtime_from_remote(self):
+        local = self.root / 'app/package.json'
+        local.write_text('{"version":"unfinished source"}')
+        original_status = self.git('status','--porcelain')
+        run = self.updater.run
+        def simulated_build(args, **kwargs):
+            if str(args[0]) == '/usr/bin/git':
+                return run(args, **kwargs)
+            if args[1:] == ['run','package']:
+                self.assertEqual(json.loads((Path(kwargs['cwd']) / 'package.json').read_text())['version'],'1.2.0')
+                candidate = Path(kwargs['cwd']) / 'release/Atlas-darwin-arm64/Atlas.app'
+                resources = candidate / 'Contents/Resources/app'
+                (resources / 'runtime/scripts').mkdir(parents=True)
+                (resources / 'runtime/scripts/gl_common.py').write_text('# release runtime')
+                (resources / 'build-info.json').write_text(json.dumps({'revision':self.latest}))
+                (candidate / 'Contents/Info.plist').write_bytes(plistlib.dumps({
+                    'CFBundleIdentifier':'local.atlas.assistant', 'CFBundleShortVersionString':'1.2.0'}))
+            elif args[0] == '/usr/bin/ditto':
+                shutil.copytree(args[1],args[2])
+            return ''
+        with patch.object(self.updater,'run',side_effect=simulated_build), patch.object(self.updater,'activate') as activate:
+            self.updater.install()
+        activate.assert_called_once()
+        self.assertEqual(local.read_text(),'{"version":"unfinished source"}')
+        self.assertEqual(self.git('status','--porcelain'),original_status)
+        self.assertEqual(self.git('rev-parse','HEAD'),self.latest)
+        self.assertEqual(self.updater.status()['phase'],'complete')
 
     def test_failed_restart_restores_previous_bundle(self):
         staging = self.bundle.parent / 'staging'

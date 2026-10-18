@@ -12,7 +12,7 @@ Atlas brings your existing Germany-life project and Hermes Agent into one local 
 - **Ask Atlas:** Hermes with local Gemma, enabled web search/extraction, and recent conversation context. Searches contact external search providers/sites; model inference stays local. Full chat history is saved in Atlas; only a bounded recent selection is sent each turn so the 16K model never has to resume the older 64K-compression-dependent session.
 - **Settings:** edit your profile, change reasoning effort, start or stop Gemma, manage routines, check sources, and install app updates.
 
-The version (currently 1.10.1) is shown at the bottom of the sidebar and under **Atlas → About Atlas**. It is set in `app/package.json`; bump it there when you change the app.
+The version (currently 1.11.1) is shown at the bottom of the sidebar and under **Atlas → About Atlas**. It is set in `app/package.json`; bump it there when you change the app.
 
 ## Updating Atlas
 
@@ -20,7 +20,9 @@ Open **Settings → Updates**, or **Atlas → Check for Updates…** in the Mac 
 
 The updater fetches `main` from the private `Vector1239/atlas` repository and compares its commit with the installed build. It still detects an update if you have already pulled the source, or if a commit did not bump the version. Builds run in a temporary checkout; the app is signed locally, installed and restarted, with the previous app restored if the new app fails its startup check. Personal profiles, chats and other local data stay in place.
 
-Keep the source clone at its configured location, with Node.js, Git and the GitHub CLI installed and signed in. Updates require the checkout to be on `main`, with no uncommitted source changes or diverged commits. The updater only fast-forwards the checkout; it does not discard or stash your work. Nothing is downloaded or installed until you use the update controls. Stop any active AI request before installing; Gemma’s paused/startup preference is preserved.
+Keep the source clone at its configured location, with Node.js, Git and the GitHub CLI installed and signed in. Updates build the fetched `main` commit in a separate checkout, with its runtime scripts included in the app. Your development checkout, branch, local edits and untracked files are preserved. An older version on GitHub is never offered as a downgrade. Nothing is downloaded or installed until you use the update controls. Stop any active AI request before installing; Gemma’s paused/startup preference is preserved.
+
+If an older installed updater refuses to update because of local edits, quit Atlas with **Command-Q**, then open `app/Update Atlas.command` from this checkout once. It uses the fixed updater to build and install GitHub main; subsequent updates work in the app.
 
 ## First use
 

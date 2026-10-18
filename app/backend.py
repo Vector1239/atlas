@@ -30,7 +30,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PROJECT = Path(os.environ.get("ATLAS_PROJECT") or Path.home() / "Projects/Atlas/germany-life-hermes")
 os.environ["GERMANY_LIFE_HOME"] = str(PROJECT)
-sys.path.insert(0, str(PROJECT / "scripts"))
+RUNTIME = Path(__file__).parent / "runtime"
+SCRIPTS = RUNTIME / "scripts" if (RUNTIME / "scripts/gl_common.py").is_file() else PROJECT / "scripts"
+sys.path.insert(0, str(SCRIPTS))
 import gl_common as gl
 import job_scan
 import morning_brief
@@ -485,7 +487,7 @@ def translate_job_titles(kind="jobs", background=False):
 
 
 def run_ctl(args):
-    result = subprocess.run([sys.executable, str(PROJECT / "scripts/glctl.py"), *args],
+    result = subprocess.run([sys.executable, str(SCRIPTS / "glctl.py"), *args],
                             capture_output=True, text=True, timeout=15, env=os.environ.copy())
     if result.returncode:
         raise ValueError(result.stderr.strip() or result.stdout.strip())
@@ -634,7 +636,7 @@ def chat_worker(message_id, message, kind):
             context['recent_conversation'] = recent_chat(message_id)
         news = []
         if kind == "brief":
-            rules = PROJECT / "skills/trier-morning-brief/SKILL.md"
+            rules = (RUNTIME if (RUNTIME / "skills").is_dir() else PROJECT) / "skills/trier-morning-brief/SKILL.md"
             message = ("Write my morning brief from the supplied facts, under 300 words, in English, preserving links. "
                        "Do not call tools or fetch sources: the data and profile are already provided. Headlines are not full articles; do not invent article details. "
                        "Translate German carefully, preserving negation: a cancelled or suspended strike is not an upcoming strike. Omit anything you cannot translate confidently.")
