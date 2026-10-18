@@ -12,6 +12,7 @@
 .job-source-settings { margin-bottom: 20px; }
 .job-source-fields { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(200px, 2fr); gap: 16px; margin-top: 20px; }
 .job-source-fields label { display: grid; gap: 8px; font-size: 13px; }
+.event-source-field { display: grid; gap: 8px; font-size: 13px; margin-top: 20px; max-width: 520px; }
 @media (max-width: 720px) { .job-source-fields { grid-template-columns: 1fr; } }
 
 .job-manual-search{border-top:1px solid #e2e7d8;margin-top:20px;padding-top:16px}.job-manual-search .button{margin-top:12px}

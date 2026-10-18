@@ -210,10 +210,12 @@ def enrich_job(job, translations=None):
     return result
 
 
-def upcoming_events(today):
-    """Keep ongoing events, remove expired/cancelled entries, and flag old checks."""
+def upcoming_events(today, live=()):
+    """Keep ongoing events, remove expired/cancelled entries, and flag old checks.
+
+    `live` adds events from live sources (Ticketmaster); they bring their own venue pins."""
     items = []
-    for row in EVENT_CATALOG["events"]:
+    for row in [*EVENT_CATALOG["events"], *live]:
         try:
             start = dt.date.fromisoformat(row["start"])
             end = dt.date.fromisoformat(row.get("end") or row["start"])
@@ -222,7 +224,7 @@ def upcoming_events(today):
             continue
         if end < today or end < start or row.get("cancelled"):
             continue
-        items.append({**row, "location": city_location(row.get("city"), row.get("country", "Germany")),
+        items.append({**row, "location": row.get("location") or city_location(row.get("city"), row.get("country", "Germany")),
                       "ongoing": start < today, "stale": (today - checked).days > 14})
     return {"items": sorted(items, key=lambda row: row["start"]),
             "calendars": EVENT_CATALOG["calendars"], "checked_at": EVENT_CATALOG["checked_at"]}

@@ -43,6 +43,7 @@ import updater
 import news_media
 import news_store
 import job_details
+import event_sources
 import job_insights
 import tech
 import hermes_link
@@ -77,6 +78,7 @@ MODEL_ERROR = ""
 REFRESH_STATUS = {"running": False, "message": "", "error": ""}
 TRANSLATION_STATUS = {"running": False, "error": "", "completed": 0}
 DESCRIBE_STATUS = {"running": False, "fetched": 0}
+EVENTS_STATUS = {"running": False, "checked": 0.0}
 DESCRIPTIONS = {}      # job id -> Bundesagentur description (its listings arrive without one)
 TASKS = {}             # brief / market write-ups in progress: kind -> row (kept out of the chat)
 DATA = gl.load_json(STORE, {"chat": [], "brief": None, "settings": {"reasoning": "none"}})
@@ -89,6 +91,8 @@ DATA["settings"].pop("model_autostart", None)  # Hermes decides when Gemma loads
 DATA["settings"].setdefault("hermes_session", "atlas-" + uuid.uuid4().hex[:12])
 DATA["settings"].setdefault("auto_brief", True)
 CACHE = gl.load_json(SNAPSHOT, {"news": [], "jobs": [], "weather": [], "mensa": [], "sources": []})
+_live = event_sources.cached(STATE_DIR) if event_sources.credentials(STATE_DIR) else {}
+LIVE_EVENTS = {"rows": _live.get("events", []), "fetched_at": _live.get("fetched_at"), "error": _live.get("error", "")}
 # Removed providers must disappear immediately, including from older snapshots.
 CACHE["jobs"] = [job for job in CACHE.get("jobs", []) if not job.get("source", "").startswith("Adzuna")]
 CACHE["sources"] = [source for source in CACHE.get("sources", []) if not source.get("name", "").startswith("Adzuna")]
@@ -430,6 +434,30 @@ def enriched_news(news):
     return _NEWS["items"]
 
 
+def home_base():
+    home = config().get("home", {})
+    return {"city": home.get("city", "Trier"), "lat": home.get("lat", 49.7499), "lon": home.get("lon", 6.6371)}
+
+
+def refresh_events(force=False):
+    """Ticketmaster events (optional free key), at most every 12 hours unless the key just changed."""
+    if EVENTS_STATUS["running"]:
+        return
+    EVENTS_STATUS.update(running=True, checked=time.time())
+    try:
+        cache = event_sources.refresh(STATE_DIR, home_base(), gl.now(config()).date(), force=force)
+        LIVE_EVENTS.update(rows=cache.get("events", []), fetched_at=cache.get("fetched_at"), error=cache.get("error", ""))
+    except Exception as exc:
+        with contextlib.suppress(OSError), (STATE_DIR / "hermes-chat.log").open("a") as log:
+            log.write(f"\n{iso_now()} live events failed: {exc}\n")
+    finally:
+        EVENTS_STATUS["running"] = False
+
+
+def events_now(today):
+    return discovery.upcoming_events(today, LIVE_EVENTS["rows"])
+
+
 def describe_jobs():
     """After a refresh: map pins for new cities, then Bundesagentur descriptions (cached a week) for the job market."""
     if DESCRIBE_STATUS["running"]:
@@ -483,7 +511,9 @@ def public_state():
     result["jobs"] = enriched_jobs(jobs)
     result["job_market"] = {**job_market(result["jobs"]), "reading": DESCRIBE_STATUS.copy()}
     result["news"], result["news_media"] = NEWS_MEDIA.enrich(enriched_news(result.get("news", [])))
-    result["events"] = discovery.upcoming_events(today)
+    result["events"] = events_now(today)
+    result["event_provider"] = {"configured": bool(event_sources.credentials(STATE_DIR)), "count": len(LIVE_EVENTS["rows"]),
+                                "fetched_at": LIVE_EVENTS["fetched_at"], "error": LIVE_EVENTS["error"], "running": EVENTS_STATUS["running"]}
     result['tech'] = tech.public_state(STATE_DIR, today)
     result['capabilities'] = {'web_search': True, 'web_extract': True, 'note': 'Hermes web tools enabled; searches contact external websites.'}
     home = config().get("home", {})
@@ -784,7 +814,7 @@ def brief_jobs(jobs, today):
 
 def brief_events(today):
     soon = (today + dt.timedelta(days=7)).isoformat()
-    rows = [row for row in discovery.upcoming_events(today)["items"] if row["start"] <= soon]
+    rows = [row for row in events_now(today)["items"] if row["start"] <= soon]
     rows.sort(key=lambda row: (row.get("area") != "Trier", row["start"]))
     return [{"title": row["title"], "start": row["start"], "city": row.get("city", ""), "url": row["url"]} for row in rows[:5]]
 
@@ -915,6 +945,17 @@ def api_post(path, body):
         if kind not in ("regular", "hiwi"):
             raise ValueError("Choose a work type.")
         return {"ok": True, "message": run_ctl(["work", "add", "--hours", str(hours), "--employer=" + validate_text(body.get("employer"), "employer"), "--date", validate_date(body.get("date", "")), "--kind", kind])}
+    if path == "/api/events/provider":
+        key = body.get("key", "")
+        if not isinstance(key, str):
+            raise ValueError("Enter a valid API key.")
+        event_sources.save_key(STATE_DIR, key.strip())
+        if key.strip():
+            threading.Thread(target=refresh_events, kwargs={"force": True}, daemon=True).start()
+        else:
+            (STATE_DIR / "live_events.json").unlink(missing_ok=True)
+            LIVE_EVENTS.update(rows=[], fetched_at=None, error="")
+        return {"ok": True}
     if path == "/api/jobs/provider":
         key = body.get("key", "")
         if not isinstance(key, str):
@@ -1161,6 +1202,8 @@ def maintenance():
             threading.Thread(target=describe_jobs, daemon=True).start()
         with contextlib.suppress(Exception):
             auto_brief()
+        if not EVENTS_STATUS["running"] and time.time() - EVENTS_STATUS["checked"] > 600:
+            threading.Thread(target=refresh_events, daemon=True).start()
         if not UPDATES.status()['running'] and time.time() - last_tech_refresh > 6 * 3600:
             last_tech_refresh = time.time()
             threading.Thread(target=tech.refresh, args=(STATE_DIR, gl.now(config()).date()), daemon=True).start()
