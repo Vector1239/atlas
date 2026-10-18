@@ -14,9 +14,67 @@ PLACES = json.loads((CONTENT / "places.json").read_text())
 NEWS_TRANSLATIONS = json.loads((CONTENT / "news-translations.json").read_text())
 
 
+GEOCODED = {}  # cities places.json lacks, looked up with the same geocoder and cached in state/places_cache.json
+COUNTRIES = {"DE": "Germany", "LU": "Luxembourg", "NL": "The Netherlands", "AT": "Austria",
+             "BE": "Belgium", "FR": "France", "CH": "Switzerland"}
+GEOCODER = "https://geocoding-api.open-meteo.com/v1/search?"
+
+
+def load_places(path):
+    try:
+        cache = json.loads(Path(path).read_text())
+    except (OSError, ValueError):
+        return {}
+    GEOCODED.update({entry["label"]: entry["place"] for entry in cache.values()
+                     if isinstance(entry, dict) and isinstance(entry.get("place"), dict)})
+    return cache
+
+
+def geocode(places, path, fetch, limit=40, retry_days=30):
+    """Pins for cities places.json lacks: [(city, country code, region)] -> cached Open-Meteo / GeoNames matches.
+
+    Only a populated place whose name matches the listing's city in that country gets a pin; the
+    region the listing gives decides between towns with the same name."""
+    import time
+    import urllib.parse
+    cache, looked = load_places(path), 0
+    for city, code, region in places:
+        key = f"{city}|{code}"
+        entry = cache.get(key, {})
+        if city in PLACES or code not in COUNTRIES or time.time() - entry.get("at", 0) < retry_days * 86400 or looked >= limit:
+            continue
+        looked += 1
+        base = re.split(r"\s*[,(/]", city)[0].strip()
+        names = list(dict.fromkeys([base, re.sub(r"\s+(?:am|an der|im|in der|ob der|bei)\s.+$", "", base)]))
+        found = None
+        for name in names:
+            for language in ("de", "en"):
+                try:
+                    rows = fetch(GEOCODER + urllib.parse.urlencode({"name": name, "count": 10, "language": language,
+                                                                    "countryCode": code, "format": "json"})).get("results") or []
+                except Exception:
+                    rows = []
+                rows = [row for row in rows if row.get("country_code") == code and str(row.get("feature_code", "")).startswith("PPL")
+                        and str(row.get("name", "")).casefold() == name.casefold()]
+                rows.sort(key=lambda row: (bool(region) and row.get("admin1") != region, -(row.get("population") or 0)))
+                if rows:
+                    row = rows[0]
+                    found = {"lat": round(row["latitude"], 5), "lon": round(row["longitude"], 5), "name": row["name"],
+                             "country": COUNTRIES[code], "country_code": code, "region": row.get("admin1", ""),
+                             "geonames_id": row.get("id"), "precision": "city"}
+                    break
+            if found:
+                break
+        cache[key] = {"label": city, "place": found, "at": time.time()}
+        if found:
+            GEOCODED[city] = found
+    Path(path).write_text(json.dumps(cache, ensure_ascii=False, indent=1))
+    return looked
+
+
 def city_location(city, country="Germany"):
     """Only use verified city matches. Never invent an exact address or unknown pin."""
-    place = PLACES.get(city)
+    place = PLACES.get(city) or GEOCODED.get(city)
     if not place or place["country"] != {"Netherlands": "The Netherlands"}.get(country, country):
         return None
     return {**place, "label": city, "source": "Open-Meteo / GeoNames"}

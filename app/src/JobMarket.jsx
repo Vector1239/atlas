@@ -54,7 +54,7 @@ export default function JobMarket({ data, act }) {
   const student = payTile(market.pay.hourly, hourly, 'No posting lists an hourly rate yet'), salary = payTile(market.pay.annual, yearly, 'No posting lists a salary yet');
   const experience = market.experience;
   return <>
-    <div className="page-heading"><div><div className="eyebrow">WHAT THE LISTINGS SAY</div><h1>Your job market.</h1><p>Every figure is counted from the {market.total} roles Atlas found around {data.home.city}; nothing here is estimated by AI.</p></div><button className="button secondary" disabled={data.refresh.running} onClick={() => act('/api/refresh', {})}><ArrowClockwiseIcon size={15} />{data.refresh.running ? 'Refreshing…' : 'Refresh'}</button></div>
+    <div className="page-heading"><div><div className="eyebrow">WHAT THE LISTINGS SAY</div><h1>Your job market.</h1><p>Every figure is counted from the {market.total} roles Atlas found, from {data.home.city} outwards; nothing here is estimated by AI.</p></div><button className="button secondary" disabled={data.refresh.running} onClick={() => act('/api/refresh', {})}><ArrowClockwiseIcon size={15} />{data.refresh.running ? 'Refreshing…' : 'Refresh'}</button></div>
     {market.reading?.running && <div className="refresh-status"><span className="dot pulse" />Reading Bundesagentur job descriptions… {market.reading.fetched} checked</div>}
     <div className="market-tiles">
       <Tile label="Roles found" value={market.total.toLocaleString('en-GB')} note={`${market.students} student roles · ${described} with a description`} />
