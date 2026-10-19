@@ -1,59 +1,95 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { createRequire } from 'node:module';
 
-const { translateTexts, batches, setFetch, languageName, isEnglish } = createRequire(import.meta.url)('../browser/translate.cjs');
+const require = createRequire(import.meta.url);
+const { translateTexts, batches, detectLanguage, languageName, isEnglish } = require('../browser/translate.cjs');
+const local = require('../browser/local-translator.cjs');
 
-function fakeService({ expireFirst = false } = {}) {
-  const calls = { auth: 0, translate: [] };
-  let tokens = 0;
-  setFetch(async (url, options = {}) => {
-    if (url.startsWith('https://edge.microsoft.com/translate/auth')) {
-      calls.auth++;
-      return new Response(`token-${++tokens}`);
-    }
-    assert.match(url, /^https:\/\/api-edge\.cognitive\.microsofttranslator\.com\/translate\?api-version=3\.0&textType=html&to=en$/);
-    if (expireFirst && options.headers.Authorization === 'Bearer token-1') return new Response('expired', { status: 401 });
-    const body = JSON.parse(options.body);
-    calls.translate.push(body.map(item => item.Text));
-    return Response.json(body.map(item => ({ detectedLanguage: { language: 'de', score: 1 }, translations: [{ text: `EN:${item.Text}`, to: 'en' }] })));
-  });
-  return calls;
+const sha = text => crypto.createHash('sha256').update(text).digest('hex');
+const REGISTRY = 'https://storage.googleapis.com/bergamot-models-sandbox/0.3.3/';
+
+function fakeRegistry(folder, { badModel = false } = {}) {
+  const files = { model: 'model.deen.bin', lex: 'lex.deen.bin', vocab: 'vocab.deen.spm' };
+  const body = name => `contents of ${name}`;
+  const registry = { deen: Object.fromEntries(Object.entries(files).map(([part, name]) => [part, { name, expectedSha256Hash: sha(body(name)) }])), ende: {} };
+  const requests = [];
+  local.configure({ folder, fetch: async url => {
+    requests.push(url.replace(REGISTRY, ''));
+    if (url === `${REGISTRY}registry.json`) return Response.json(registry);
+    const name = url.split('/').pop();
+    return new Response(badModel && name.startsWith('model') ? 'tampered' : body(name));
+  } });
+  return requests;
 }
 
-test('texts are translated in order through Edge’s Microsoft Translator service', async () => {
-  const calls = fakeService();
-  const answers = await translateTexts(['Hauptmarkt', 'Der Markt öffnet am 20. November']);
-  assert.deepEqual(answers, [{ text: 'EN:Hauptmarkt', from: 'de' }, { text: 'EN:Der Markt öffnet am 20. November', from: 'de' }]);
-  assert.equal(calls.auth, 1);
+test('a language model downloads once, is checked, and is read from disk afterwards', async () => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-models-'));
+  try {
+    const requests = fakeRegistry(folder);
+    let downloads = 0;
+    const buffers = await local.loadModel('de', () => downloads++);
+    assert.equal(Buffer.from(buffers.model).toString(), 'contents of model.deen.bin');
+    assert.equal(buffers.vocabs.length, 1);
+    assert.equal(downloads, 1);
+    assert.deepEqual(await local.sourceLanguages(), ['de']);
+    assert.ok(fs.existsSync(path.join(folder, 'deen', 'model.deen.bin')));
+
+    const again = fakeRegistry(folder);
+    await local.loadModel('de', () => downloads++);
+    assert.equal(downloads, 1);
+    assert.deepEqual(again, ['registry.json']);
+    assert.ok(requests.includes('deen/model.deen.bin'));
+  } finally { fs.rmSync(folder, { recursive: true, force: true }); }
 });
 
-test('repeated text comes from the cache and the sign-in token is reused', async () => {
-  const calls = fakeService();
-  await translateTexts(['Tickets', 'Anfahrt']);
-  const answers = await translateTexts(['Anfahrt', 'Kontakt', 'Tickets']);
-  assert.deepEqual(answers.map(answer => answer.text), ['EN:Anfahrt', 'EN:Kontakt', 'EN:Tickets']);
-  assert.deepEqual(calls.translate, [['Tickets', 'Anfahrt'], ['Kontakt']]);
-  assert.equal(calls.auth, 1);
+test('a model file that fails its checksum is refused and not kept', async () => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-models-'));
+  try {
+    fakeRegistry(folder, { badModel: true });
+    await assert.rejects(local.loadModel('de'), /failed its checksum/);
+    assert.equal(fs.existsSync(path.join(folder, 'deen', 'model.deen.bin')), false);
+    await assert.rejects(local.loadModel('xx'), /no on-device model/);
+  } finally { fs.rmSync(folder, { recursive: true, force: true }); }
 });
 
-test('an expired sign-in is renewed once', async () => {
-  const calls = fakeService({ expireFirst: true });
-  const [answer] = await translateTexts(['Veranstaltungen']);
-  assert.equal(answer.text, 'EN:Veranstaltungen');
-  assert.equal(calls.auth, 2);
+test('the language list still loads offline from the saved copy', async () => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-models-'));
+  try {
+    fakeRegistry(folder);
+    await local.sourceLanguages();
+    local.configure({ folder, fetch: async () => { throw new Error('offline'); } });
+    assert.deepEqual(await local.sourceLanguages(), ['de']);
+  } finally { fs.rmSync(folder, { recursive: true, force: true }); }
 });
 
-test('service errors are reported instead of leaving the page half-done silently', async () => {
-  setFetch(async url => url.includes('/auth') ? new Response('token') : new Response('busy', { status: 429 }));
-  await assert.rejects(translateTexts(['Stadtrat']), /Microsoft Translator answered 429/);
+test('repeated text is translated once and comes back in order', async () => {
+  const calls = [];
+  const engine = translateTexts.engine;
+  translateTexts.engine = async (texts, from) => { calls.push([from, ...texts]); return texts.map(text => `EN:${text}`); };
+  try {
+    assert.deepEqual(await translateTexts(['Tickets', 'Anfahrt'], 'de'), ['EN:Tickets', 'EN:Anfahrt']);
+    assert.deepEqual(await translateTexts(['Anfahrt', 'Kontakt', 'Tickets'], 'de'), ['EN:Anfahrt', 'EN:Kontakt', 'EN:Tickets']);
+    assert.deepEqual(calls, [['de', 'Tickets', 'Anfahrt'], ['de', 'Kontakt']]);
+  } finally { translateTexts.engine = engine; }
 });
 
-test('large pages are split into request-sized batches', () => {
-  const many = Array.from({ length: 250 }, (_, i) => `Text ${i}`);
-  assert.deepEqual(batches(many).map(group => group.length), [100, 100, 50]);
-  const long = ['x'.repeat(5000), 'y'.repeat(5000), 'z'];
-  assert.deepEqual(batches(long).map(group => group.length), [1, 2]);
+test('pages are split into small batches so on-screen text lands first', () => {
+  const many = Array.from({ length: 50 }, (_, i) => `Text ${i}`);
+  assert.deepEqual(batches(many).map(group => group.length), [24, 24, 2]);
+  assert.deepEqual(batches(['x'.repeat(3000), 'y'.repeat(3000), 'z']).map(group => group.length), [1, 2]);
+});
+
+test('a page’s language is recognised from its words when it doesn’t declare one', () => {
+  assert.equal(detectLanguage(['Der Markt öffnet am 20. November auf dem Hauptmarkt und ist bis Weihnachten für alle da.']), 'de');
+  assert.equal(detectLanguage(['<span id="t0">Le marché ouvre </span><span id="t1">le 20 novembre</span> sur la place et est pour tous.']), 'fr');
+  assert.equal(detectLanguage(['De markt opent op 20 november en is voor iedereen met de kinderen.']), 'nl');
+  assert.equal(detectLanguage(['The market opens on 20 November and is open to everyone in the town.']), 'en');
+  assert.equal(detectLanguage(['Tickets']), '');
 });
 
 test('language codes read as names, and English is recognised', () => {

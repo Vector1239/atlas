@@ -1,6 +1,6 @@
 {
   "name": "atlas-local",
-  "version": "1.12.14",
+  "version": "1.12.15",
   "description": "Your local life assistant, powered by Hermes and Gemma",
   "private": true,
   "type": "module",
@@ -13,6 +13,7 @@
     "prebuild": "node build-info.cjs"
   },
   "dependencies": {
+    "@browsermt/bergamot-translator": "0.4.9",
     "@phosphor-icons/react": "^2.1.10",
     "leaflet": "^1.9.4",
     "react": "^19.3.1",
