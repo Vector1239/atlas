@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowClockwiseIcon, ArrowUpRightIcon, NewspaperIcon, SlidersHorizontalIcon, TranslateIcon, XIcon } from '@phosphor-icons/react';
+import { ArrowClockwiseIcon, ArrowUpRightIcon, BookmarkSimpleIcon, NewspaperIcon, SlidersHorizontalIcon, TranslateIcon, XIcon } from '@phosphor-icons/react';
 import { niceDate, safeLink } from './format.js';
-import { initialNewsFilters, selectNews, newsRegions } from './news-filters.js';
+import { initialNewsFilters, selectNews, newsRegions, isSaved, savedStories } from './news-filters.js';
 import './news.css';
 
 const published = value => value && Number.isFinite(Date.parse(value)) ? niceDate(value, { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) : 'Date not provided';
@@ -13,7 +13,11 @@ export function ArticleImage({ item, prominent = false, placeholder = false }) {
   if (!available) return placeholder ? <div className="story-image-unavailable"><NewspaperIcon size={27} weight="light" aria-hidden="true" /><span>No publisher image</span></div> : null;
   return <figure className="article-picture"><a href={safeLink(item.article_url || item.url)} target="_blank" rel="noreferrer" aria-label={`Read ${item.title_en || item.title}`}><img src={item.picture.url} alt={item.picture.alt || `Article image supplied by ${item.source}`} loading={prominent ? 'eager' : 'lazy'} decoding="async" onError={() => setFailed(true)} /></a><figcaption>{item.picture.credit || item.source} · Article image</figcaption></figure>;
 }
-function Story({ item, original, ask, prominent }) {
+export function SaveStory({ item, saved, act, label = false }) {
+  const title = item.title_en || item.title;
+  return <button className={`story-save ${saved ? 'is-saved' : ''}`} aria-pressed={saved} aria-label={saved ? `Remove “${title}” from Saved` : `Save “${title}”`} title={saved ? 'Saved · click to remove' : 'Save for later'} onClick={() => act('/api/news/save', { url: item.url })}><BookmarkSimpleIcon size={15} weight={saved ? 'fill' : 'bold'} aria-hidden="true" />{label && (saved ? 'Saved' : 'Save')}</button>;
+}
+function Story({ item, original, ask, prominent, saved, act }) {
   return <article className="news-story">
     <ArticleImage item={item} prominent={prominent} placeholder />
     <div className="story-copy"><div className="story-kicker"><span>{newsRegions[item.ring] || 'From your sources'}</span><span>·</span><span>{item.source.replace('Google News: ', '')}</span></div>
@@ -21,15 +25,16 @@ function Story({ item, original, ask, prominent }) {
       {!original && item.translation_needed && <span className="untranslated-label">Original headline · English translation pending</span>}
       <div className="story-date"><time dateTime={item.published || undefined}>{published(item.published)}</time>{item.feed && item.feed !== item.source && <span>Via {item.feed.replace('Google News: ', 'Google News · ')}</span>}</div>
       {!original && item.translated && <details className="headline-original"><summary>Original headline</summary><p>{item.title}</p></details>}
-      <div className="story-actions"><a href={safeLink(item.article_url || item.url)} target="_blank" rel="noreferrer">Read at source <ArrowUpRightIcon size={12} /></a><button onClick={() => ask(`Explain this news item in plain English using only its headline, and say what further information you would need. Do not invent article details.\n${item.title}\n${item.url}`)}>Ask Atlas</button></div>
+      <div className="story-actions"><a href={safeLink(item.article_url || item.url)} target="_blank" rel="noreferrer">Read at source <ArrowUpRightIcon size={12} /></a><SaveStory item={item} saved={saved} act={act} label /><button onClick={() => ask(`Explain this news item in plain English using only its headline, and say what further information you would need. Do not invent article details.\n${item.title}\n${item.url}`)}>Ask Atlas</button></div>
     </div>
   </article>;
 }
-export default function News({ data, act, ask }) {
+export default function News({ data, act, ask, showSaved, setShowSaved }) {
   const [filters, setFilters] = useState(initialNewsFilters), [original, setOriginal] = useState(false), [panelOpen, setPanelOpen] = useState(false);
   const panel = useRef(null);
   const set = (key,value) => setFilters(previous => ({ ...previous, [key]:value }));
-  const items = selectNews(data.news, filters);
+  const saved = data.saved_news || [];
+  const items = showSaved ? savedStories(data.news, saved) : selectNews(data.news, filters);
   const activeFilters = Object.keys(initialNewsFilters).filter(key => filters[key] !== initialNewsFilters[key]).length;
   const pending = data.news.filter(item => item.translation_needed).length;
   const translating = data.translation?.running && data.translation.kind === 'news';
@@ -38,16 +43,18 @@ export default function News({ data, act, ask }) {
   const openPanel = () => { if (!panel.current.open) panel.current.showModal(); setPanelOpen(true); };
   const closePanel = () => { panel.current?.close(); setPanelOpen(false); };
   return <>
-    <header className="news-toolbar"><div className="news-title"><h1>News.</h1><span aria-live="polite">{activeFilters ? `${items.length} of ${data.news.length}` : data.news.length} stories</span></div><div className="news-toolbar-actions">
-      {!!activeFilters && <button className="text-button news-clear" onClick={reset}>Clear filters</button>}
-      <button className="button secondary" aria-haspopup="dialog" aria-expanded={panelOpen} aria-controls="news-options" onClick={openPanel}><SlidersHorizontalIcon size={16} />Filters & display{!!activeFilters && <span className="news-filter-count">{activeFilters}</span>}</button>
+    <header className="news-toolbar"><div className="news-title"><h1>{showSaved ? 'Saved.' : 'News.'}</h1><span aria-live="polite">{showSaved ? `${items.length} saved ${items.length === 1 ? 'story' : 'stories'}` : activeFilters ? `${items.length} of ${data.news.length} stories` : `${data.news.length} stories`}</span></div><div className="news-toolbar-actions">
+      <button className="button secondary" aria-pressed={showSaved} onClick={() => setShowSaved(!showSaved)}><BookmarkSimpleIcon size={16} weight={showSaved ? 'fill' : 'bold'} />{showSaved ? 'All news' : `Saved${saved.length ? ` · ${saved.length}` : ''}`}</button>
+      {!showSaved && !!activeFilters && <button className="text-button news-clear" onClick={reset}>Clear filters</button>}
+      {!showSaved && <button className="button secondary" aria-haspopup="dialog" aria-expanded={panelOpen} aria-controls="news-options" onClick={openPanel}><SlidersHorizontalIcon size={16} />Filters & display{!!activeFilters && <span className="news-filter-count">{activeFilters}</span>}</button>}
       <button className="button secondary" disabled={data.refresh.running} onClick={() => act('/api/refresh', {})} aria-label="Refresh news"><ArrowClockwiseIcon size={16} /><span>{data.refresh.running ? 'Refreshing…' : 'Refresh'}</span></button>
     </div></header>
     {!original && !!pending && <div className="news-translation-status" role="status"><TranslateIcon size={14} /><span>{translating ? `Translating headlines locally · ${pending} remaining` : data.model.ready ? `${pending} headlines queued · English translations run automatically while Gemma is idle` : `${pending} headlines await English translation · Start Gemma in Settings`}</span>{data.model.ready && !translating && <button className="text-button" disabled={data.busy || data.translation.running} onClick={() => act('/api/news/translate', {})}>Translate now</button>}</div>}
-    {!!activeFilters && <div className="news-view-summary">{filters.region !== 'all' ? newsRegions[Number(filters.region)] : 'Everywhere'} · {filters.source !== 'all' ? filters.source : 'All sources'}{filters.search && ` · “${filters.search}”`}{filters.period !== 'all' && ` · Past ${filters.period} hours`}{filters.photos && ' · With images'}{filters.sort === 'newest' && ' · Newest first'}</div>}
-    {!!items.length && <section className="news-story-grid" aria-label="News stories">{items.map((item,index) => <Story key={item.url} item={item} original={original} ask={ask} prominent={index < 3} />)}</section>}
-    {!items.length && <div className="empty"><NewspaperIcon size={32} /><h3>{data.news.length ? 'No stories match this view.' : 'Your reading starts here.'}</h3><p>{data.news.length ? 'Try another source, region or search.' : 'Refresh news to gather the latest headlines.'}</p><button className="button secondary" onClick={data.news.length ? reset : () => act('/api/refresh', {})} disabled={!data.news.length && data.refresh.running}>{data.news.length ? 'Clear filters' : 'Refresh news'}</button></div>}
-    <p className="news-footnote">All {items.length} {items.length === 1 ? 'story' : 'stories'} shown. Gathered stories stay available for 14 days, even after leaving a publisher’s feed. Images and reporting belong to their publishers; stories without an accessible publisher image are labelled.</p>
+    {!showSaved && !!activeFilters && <div className="news-view-summary">{filters.region !== 'all' ? newsRegions[Number(filters.region)] : 'Everywhere'} · {filters.source !== 'all' ? filters.source : 'All sources'}{filters.search && ` · “${filters.search}”`}{filters.period !== 'all' && ` · Past ${filters.period} hours`}{filters.photos && ' · With images'}{filters.sort === 'newest' && ' · Newest first'}</div>}
+    {!!items.length && <section className="news-story-grid" aria-label="News stories">{items.map((item,index) => <Story key={item.url} item={item} original={original} ask={ask} prominent={index < 3} saved={isSaved(saved, item)} act={act} />)}</section>}
+    {showSaved && !items.length && <div className="empty"><BookmarkSimpleIcon size={32} /><h3>Nothing saved yet.</h3><p>Use the bookmark next to a story, here or in your morning brief, to keep it.</p><button className="button secondary" onClick={() => setShowSaved(false)}>Browse news</button></div>}
+    {!showSaved && !items.length && <div className="empty"><NewspaperIcon size={32} /><h3>{data.news.length ? 'No stories match this view.' : 'Your reading starts here.'}</h3><p>{data.news.length ? 'Try another source, region or search.' : 'Refresh news to gather the latest headlines.'}</p><button className="button secondary" onClick={data.news.length ? reset : () => act('/api/refresh', {})} disabled={!data.news.length && data.refresh.running}>{data.news.length ? 'Clear filters' : 'Refresh news'}</button></div>}
+    {showSaved ? !!items.length && <p className="news-footnote">Saved stories stay here until you remove them, on this Mac only.</p> : <p className="news-footnote">All {items.length} {items.length === 1 ? 'story' : 'stories'} shown. Gathered stories stay available for 14 days, even after leaving a publisher’s feed. Images and reporting belong to their publishers; stories without an accessible publisher image are labelled.</p>}
     <dialog ref={panel} id="news-options" className="news-drawer" aria-labelledby="news-options-title" onClose={() => { if (!panel.current.open) setPanelOpen(false); }} onClick={event => { if (event.target === event.currentTarget) closePanel(); }}>
       <div className="news-drawer-inner"><header className="news-drawer-heading"><div><h2 id="news-options-title">Your news view</h2><p>{data.news.length} stories from {new Set(data.news.map(item => item.source)).size} sources</p></div><button type="button" className="icon-button" aria-label="Close news filters" onClick={closePanel}><XIcon size={20} /></button></header>
         <div className="news-drawer-body"><section aria-label="News filters" className="news-drawer-section">

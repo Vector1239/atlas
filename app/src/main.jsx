@@ -6,7 +6,9 @@ import Explore from './Explore.jsx';
 import JobMarket from './JobMarket.jsx';
 import Markdown from './Markdown.jsx';
 import Headlines from './Headlines.jsx';
-import News from './News.jsx';
+import News, { SaveStory } from './News.jsx';
+import Mensa from './Mensa.jsx';
+import { findStory, isSaved } from './news-filters.js';
 import Tech from './Tech.jsx';
 import Updates from './Updates.jsx';
 import JobSources from './JobSources.jsx';
@@ -36,7 +38,7 @@ function Progress({ value }) { return <div className="progress-track"><div style
 
 function App() {
   const [data, setData] = useState(null), [page, setPage] = useState(new URLSearchParams(location.search).get('settings') === 'updates' ? 'settings' : 'today'), [error, setError] = useState(''), [notice, setNotice] = useState(''), [mobileNav, setMobileNav] = useState(false);
-  const [exploreKind, setExploreKind] = useState('all');
+  const [exploreKind, setExploreKind] = useState('all'), [newsSaved, setNewsSaved] = useState(false);
   const [modal, setModal] = useState(null), [saving, setSaving] = useState(false), [loadError, setLoadError] = useState(''), [stoppingModel, setStoppingModel] = useState(false);
   const active = useRef(true);
   useEffect(() => { window.scrollTo(0, 0); }, [page]);
@@ -51,7 +53,7 @@ function App() {
     finally { setStoppingModel(false); }
   }
   async function ask(text) { const result = await act('/api/chat', { text }); if (result) setPage('chat'); }
-  function navigate(next) { if (['jobs', 'remote', 'events'].includes(next)) { setExploreKind(next); next = 'explore'; } else if (next === 'explore') setExploreKind('all'); setPage(next); setMobileNav(false); setError(''); }
+  function navigate(next) { if (['jobs', 'remote', 'events'].includes(next)) { setExploreKind(next); next = 'explore'; } else if (next === 'explore') setExploreKind('all'); if (next === 'news') setNewsSaved(false); setPage(next); setMobileNav(false); setError(''); }
   async function saveForm(e) {
     e.preventDefault(); setSaving(true);
     const body = Object.fromEntries(new FormData(e.currentTarget));
@@ -62,6 +64,8 @@ function App() {
   if (!data) return <div className="boot"><div className="brand-mark">A</div><h1>Atlas</h1><p>{loadError || 'Getting your day together…'}</p>{loadError && <Button onClick={load}>Try again</Button>}</div>;
   const model = data.model, sourceCount = (data.sources || []).filter(s => s.ok && !s.skipped).length;
   const exploreCount = exploreTotals(data), briefRun = data.tasks?.brief, market = data.job_market;
+  const savedNews = data.saved_news || [];
+  const saveLink = href => { const story = findStory(data.news, href) || findStory(savedNews, href); return story && <SaveStory item={story} saved={isSaved(savedNews, story)} act={act} />; };
   const modelLabel = { ready: 'Gemma is ready', loading: 'Gemma is loading', downloading: 'Gemma is downloading', stopped: 'Gemma is paused', offline: 'Hermes is off' }[model.state];
   return <div className="app-shell">
     <aside className={`sidebar ${mobileNav ? 'open' : ''}`}>
@@ -81,10 +85,10 @@ function App() {
           <div className="overview-strip"><div className="overview-item"><Icon as={MapPinIcon} /><div><span>YOUR BASE</span><strong>Trier, Germany</strong></div></div><div className="overview-item"><Icon as={SunIcon} /><div><span>WEATHER TODAY</span><strong>{data.weather[0] ? data.weather[0].replace('today: ', '').split(', rain')[0] : data.refresh.running ? 'Checking the forecast…' : 'Refresh to get the forecast'}</strong></div></div><div className="overview-item"><Icon as={ClockIcon} /><div><span>LAST UPDATED</span><strong>{data.refreshed_at ? when(data.refreshed_at) : 'First refresh in progress'}</strong></div></div></div>
           {data.refresh.running && <div className="refresh-status"><span className="dot pulse" />{data.refresh.message}</div>}
           <div className="today-grid"><div className="today-main-stack"><Card title="Your morning brief" label="THE BIG PICTURE" className="brief-card" action={<Badge tone="sage">WITH ATLAS</Badge>}>
-            {briefRun && !['done', 'error', 'cancelled'].includes(briefRun.status) ? (briefRun.text ? <Markdown>{briefRun.text}</Markdown> : <div className="thinking"><span className="dot pulse" />{briefRun.status === 'loading' ? 'Getting Gemma ready…' : 'Gathering news, jobs and events…'}</div>) : data.brief ? <>{briefRun?.status === 'error' && <p className="form-error">{briefRun.text}</p>}<Markdown>{data.brief.text}</Markdown><div className="card-footer"><span>Prepared {when(data.brief.at)}</span><button className="text-button" disabled={data.busy} onClick={() => act('/api/brief', {})}>Prepare again <Icon as={ArrowClockwiseIcon} size={14} /></button></div></> : <div className="brief-placeholder"><div className="brief-art"><span className="art-line line-one" /><span className="art-line line-two" /><span className="art-line line-three" /><Icon as={SparkleIcon} size={38} /></div><h3>A clearer start to your day.</h3><p>Your local news, new jobs, this week’s events, weather and reminders—brought together in a short English brief.</p><Button icon={data.busy ? PauseIcon : SparkleIcon} disabled={stoppingModel || (!data.busy && !data.refreshed_at)} onClick={() => data.busy ? stopModel() : act('/api/brief', {})}>{stoppingModel ? 'Stopping Gemma…' : data.busy ? 'Stop Gemma' : 'Prepare my brief'}</Button>{briefRun?.status === 'error' && <p className="form-error">{briefRun.text}</p>}<small>Written by local Gemma through Hermes{data.settings.auto_brief ? ' · prepared automatically each morning while Hermes is on' : ''}</small></div>}
+            {briefRun && !['done', 'error', 'cancelled'].includes(briefRun.status) ? (briefRun.text ? <Markdown linkAction={saveLink}>{briefRun.text}</Markdown> : <div className="thinking"><span className="dot pulse" />{briefRun.status === 'loading' ? 'Getting Gemma ready…' : 'Gathering news, jobs and events…'}</div>) : data.brief ? <>{briefRun?.status === 'error' && <p className="form-error">{briefRun.text}</p>}<Markdown linkAction={saveLink}>{data.brief.text}</Markdown><div className="card-footer"><span>Prepared {when(data.brief.at)}</span>{savedNews.length > 0 && <button className="text-button" onClick={() => { navigate('news'); setNewsSaved(true); }}>Saved stories · {savedNews.length}</button>}<button className="text-button" disabled={data.busy} onClick={() => act('/api/brief', {})}>Prepare again <Icon as={ArrowClockwiseIcon} size={14} /></button></div></> : <div className="brief-placeholder"><div className="brief-art"><span className="art-line line-one" /><span className="art-line line-two" /><span className="art-line line-three" /><Icon as={SparkleIcon} size={38} /></div><h3>A clearer start to your day.</h3><p>Your local news, new jobs, this week’s events, weather and reminders—brought together in a short English brief.</p><Button icon={data.busy ? PauseIcon : SparkleIcon} disabled={stoppingModel || (!data.busy && !data.refreshed_at)} onClick={() => data.busy ? stopModel() : act('/api/brief', {})}>{stoppingModel ? 'Stopping Gemma…' : data.busy ? 'Stop Gemma' : 'Prepare my brief'}</Button>{briefRun?.status === 'error' && <p className="form-error">{briefRun.text}</p>}<small>Written by local Gemma through Hermes{data.settings.auto_brief ? ' · prepared automatically each morning while Hermes is on' : ''}</small></div>}
           </Card>
             <Headlines data={data} openNews={() => navigate('news')} />
-          </div><div className="right-stack"><Card title="On the menu" label="MENSA TODAY">{data.mensa.length ? <div className="mensa">{data.mensa.map((line, i) => <p key={i} className={line.startsWith('  -') ? 'meal' : 'canteen'}>{line.replace(/^\s*-\s*/, '')}</p>)}</div> : <p className="muted">No menu available for today.</p>}</Card>
+          </div><div className="right-stack"><Card title="On the menu" label="MENSA TODAY"><Mensa data={data} /></Card>
             <Card title="Coming up" label="ON YOUR RADAR" action={<button className="icon-button" onClick={() => setModal('deadline')} aria-label="Add deadline"><Icon as={PlusIcon} /></button>}>
             {data.deadlines.filter(d => d.days_left >= -3).length ? <div className="deadline-preview">{data.deadlines.filter(d => d.days_left >= -3).slice(0, 3).map((d, i) => <div className="deadline-row" key={i}><div className="date-square"><span>{niceDate(d.date, { month: 'short' })}</span><strong>{new Date(d.date).getDate()}</strong></div><div><strong>{d.title}</strong><small>{d.days_left === 0 ? 'Today' : d.days_left < 0 ? `${-d.days_left} days overdue` : `In ${d.days_left} days`}</small></div></div>)}</div> : <Empty icon={CalendarBlankIcon} title="Room to breathe." text="No personal deadlines added yet."><button className="text-button" onClick={() => setModal('deadline')}>Add your first deadline <Icon as={PlusIcon} size={14} /></button></Empty>}
           </Card>
@@ -95,7 +99,7 @@ function App() {
           <Card title="Something to look forward to" label="UPCOMING EVENTS" className="today-events" action={<button className="text-button" onClick={() => navigate('events')}>Explore events <Icon as={ArrowUpRightIcon} size={15} /></button>}><div className="today-event-grid">{(data.events?.items || []).filter(event => event.area === 'Trier').slice(0, 3).map(event => <a key={event.id} href={safeLink(event.url)} target="_blank" rel="noreferrer"><span>{niceDate(event.start)} · {event.city}</span><strong>{event.title}</strong><small>{event.source}<Icon as={ArrowUpRightIcon} size={12} /></small></a>)}</div></Card>
           <div className="footnote"><span>{sourceCount} sources available · {data.sources.filter(s => !s.ok).length} need attention</span><button className="text-button" onClick={() => navigate('settings')}>View source status <Icon as={ArrowUpRightIcon} size={13} /></button></div>
         </>}
-        {page === 'news' && <News data={data} act={act} ask={ask} />}
+        {page === 'news' && <News data={data} act={act} ask={ask} showSaved={newsSaved} setShowSaved={setNewsSaved} />}
         {page === 'tech' && <Tech data={data} act={act} ask={ask} />}
         {page === 'explore' && <Explore data={data} act={act} ask={ask} initialKind={exploreKind} />}
         {page === 'market' && <JobMarket data={data} act={act} navigate={navigate} />}

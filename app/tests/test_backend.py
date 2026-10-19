@@ -82,7 +82,7 @@ class AtlasTests(unittest.TestCase):
         free={**cached,'source':'Bundesagentur','source_id':'free','title':'Data Analyst','company':'Free company','url':'https://jobs.example/free'}
         cfg={'jobs':{'include':['data']}}
         with patch.dict(b.CACHE,{'jobs':[cached],'news':[]}), patch.object(b,'config',return_value=cfg), \
-                patch.object(b.morning_brief,'weather',return_value=[]), patch.object(b.morning_brief,'mensa',return_value=[]), \
+                patch.object(b.morning_brief,'weather',return_value=[]), patch.object(b.morning_brief,'mensa_menu',return_value=[]), \
                 patch.object(b.NEWS_MEDIA,'start'), patch.object(b.job_scan,'fetch_bundesagentur',return_value=[free]), \
                 patch.object(b.job_scan,'fetch_arbeitnow',return_value=[]), patch.object(b.job_scan,'fetch_jsearch',return_value=[]) as paid, \
                 patch.object(b.job_scan,'fetch_remote',return_value=[]):
@@ -428,6 +428,80 @@ class AtlasTests(unittest.TestCase):
             self.assertTrue(finished.wait(3))
             self.assertEqual(call.call_args.args[0], self.backend.MODEL_ID)
         self.assertEqual(self.backend.TRANSLATIONS[title], 'Working student in sustainability research')
+
+    def test_mensa_dishes_get_english_names_and_descriptions_from_the_local_model(self):
+        b = self.backend
+        menu = [{'canteen': 'Mensa Tarforst', 'open': True, 'meals': [{'name': 'Schokoladenpudding', 'category': 'Sweet Joker', 'student': 1.3}]}]
+        finished = threading.Event()
+        save = b.gl.save_json
+        def capture_save(path, data):
+            save(path, data)
+            if path.name == 'mensa_translations.json':
+                finished.set()
+        reply = {'dishes': [{'name': 'Chocolate pudding', 'description': 'A sweet, creamy chocolate dessert.'}]}
+        with patch.dict(b.CACHE, {'mensa_menu': menu}), patch.object(b, 'model_health', return_value=True), \
+                patch.object(b.hermes_link, 'complete', return_value={'choices': [{'message': {'content': json.dumps(reply)}}]}), \
+                patch.object(b.gl, 'save_json', side_effect=capture_save):
+            self.assertEqual(b.pending_translations('mensa'), ['Schokoladenpudding'])
+            b.api_post('/api/mensa/translate', {})
+            self.assertTrue(finished.wait(3))
+            meal = b.public_state()['mensa_menu'][0]['meals'][0]
+        self.assertEqual((meal['name_en'], meal['student']), ('Chocolate pudding', 1.3))
+        self.assertIn('chocolate dessert', meal['description'])
+        self.assertEqual(b.MENSA_TRANSLATIONS['Schokoladenpudding']['name'], 'Chocolate pudding')
+
+    def test_mensa_translation_rejects_incomplete_answers(self):
+        reply = {'dishes': [{'name': 'Pizza', 'description': ' '}]}
+        with patch.object(self.backend.hermes_link, 'complete', return_value={'choices': [{'message': {'content': json.dumps(reply)}}]}):
+            with self.assertRaisesRegex(ValueError, 'incomplete'):
+                self.backend.translate_batch('mensa', ['Pizza Margherita'])
+
+    def test_brief_never_shows_skill_frontmatter_and_dates_itself(self):
+        b = self.backend
+        skill = (SOURCE / 'skills/trier-morning-brief/SKILL.md').read_text()
+        self.assertNotIn('name: trier-morning-brief', b.FRONTMATTER.sub('', skill, count=1))
+        echoed = ('name: trier-morning-brief\ndescription: Turn the MORNING DATA block into a brief.\nversion: 0.2.0\n'
+                  'metadata:\n  hermes:\n    tags: [germany]\n---\n\nTrier Morning Brief\n\n'
+                  '☀️ **Wednesday, 2026-10-19**: today: overcast\n\n⏰ **Deadlines**: Visa on 2026-10-25\n\n**Trier**\n- Story [news-0]')
+        result = b.finish_brief(echoed, b.dt.date(2026, 10, 19), ['today: overcast, 10–16 °C, rain chance 80%, wind up to 15 km/h'])
+        self.assertTrue(result.startswith('🌧️ **Monday, 19 October 2026**: overcast, 10–16 °C, rain chance 80%'))
+        self.assertNotIn('name:', result)
+        self.assertNotIn('Wednesday', result)
+        self.assertNotIn('Morning Brief', result)
+        self.assertIn('**Deadlines**: Visa on 2026-10-25', result)
+        self.assertTrue(b.brief_header(b.dt.date(2026, 10, 20), ['today: mainly clear, 8–14 °C, rain chance 5%']).startswith('🌤️ **Tuesday'))
+        with patch.dict(b.DATA, {'brief': {'text': echoed, 'at': '2026-10-19T07:00:00+02:00'}}):
+            self.assertTrue(b.public_state()['brief']['text'].startswith('Trier Morning Brief'))
+
+    def test_brief_translates_its_german_picks_so_news_shows_the_same_headline(self):
+        b = self.backend
+        title = 'Immer mehr KI-Start-ups: Wie die Region Trier ins digitale Zeitalter startet'
+        english = 'More and more AI startups: How the Trier region is launching into the digital age'
+        news = [{'title': title, 'url': 'https://lokal.example/ki', 'source': 'Trierischer Volksfreund', 'ring': 0, 'lang': 'de'}]
+        with patch.dict(b.CACHE, {'news': news}), patch.object(b.gl, 'save_json'), \
+                patch.object(b.hermes_link, 'complete', return_value={'choices': [{'message': {'content': json.dumps({'titles': [english]})}}]}):
+            b.translate_brief_headlines()
+            picked = b.brief_news()
+            self.assertEqual((picked[0]['title'], picked[0]['language']), (english, 'en'))
+            self.assertEqual(b.public_state()['news'][0]['title_en'], english)
+            linked = b.attach_brief_links('**Trier**:\n- KI-Startups boomen [news-0]', picked)
+            self.assertIn(f'[{english}][news-0] · Trierischer Volksfreund', linked)
+
+    def test_news_stories_can_be_saved_and_outlive_the_feed(self):
+        b = self.backend
+        story = {'title': 'Uni Trier startet ins Semester', 'url': 'https://lokal.example/semester', 'source': 'lokalo.de', 'ring': 0, 'lang': 'de',
+                 'published': b.dt.datetime.now(b.dt.timezone.utc).isoformat()}
+        with patch.dict(b.CACHE, {'news': [story]}), patch.dict(b.DATA, {'saved_news': []}), patch.object(b, 'persist'):
+            self.assertTrue(b.api_post('/api/news/save', {'url': story['url']})['saved'])
+            b.CACHE['news'] = []
+            saved = b.public_state()['saved_news']
+            self.assertEqual((saved[0]['url'], saved[0]['title']), (story['url'], story['title']))
+            self.assertFalse(b.api_post('/api/news/save', {'url': story['url']})['saved'])
+            self.assertEqual(b.public_state()['saved_news'], [])
+            with self.assertRaisesRegex(ValueError, 'no longer in your news'):
+                b.api_post('/api/news/save', {'url': story['url']})
+            with self.assertRaisesRegex(ValueError, 'Choose a news story'):
+                b.api_post('/api/news/save', {'url': 'javascript:alert(1)'})
 
     def test_stop_cancels_the_hermes_run_and_unloads_gemma_without_waiting_for_chat_lock(self):
         self.backend.CHAT_LOCK.acquire()
