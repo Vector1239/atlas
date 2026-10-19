@@ -70,7 +70,8 @@ def _canteens(cfg: dict) -> list[dict]:
     return canteens
 
 
-def mensa(cfg: dict, status: list, today: dt.date) -> list[str]:
+def mensa_menu(cfg: dict, status: list, today: dt.date) -> list[dict]:
+    """Today's meals per canteen: [{"canteen", "open", "meals": [{"name", "category", "student"}]}]."""
     brief = cfg.get("brief", {})
     try:
         canteens = _canteens(cfg)
@@ -83,21 +84,39 @@ def mensa(cfg: dict, status: list, today: dt.date) -> list[str]:
     if not canteens:
         status.append("· Mensa: no Trier canteen found on OpenMensa")
         return []
-    lines = []
+    menu = []
     for canteen in canteens[: brief.get("mensa_max", 2)]:
         url = f"https://openmensa.org/api/v2/canteens/{canteen['id']}/days/{today.isoformat()}/meals"
         try:
             meals = gl.http_json(url)
         except Exception:
-            lines.append(f"{canteen['name']}: closed or no menu today")
+            menu.append({"canteen": canteen["name"], "open": False, "meals": []})
             continue
-        lines.append(f"{canteen['name']}:")
-        for meal in meals[:6]:
+        rows = []
+        for meal in meals[:12]:
             price = (meal.get("prices") or {}).get("students")
-            price_text = f" — €{price:.2f} students" if isinstance(price, (int, float)) else ""
-            lines.append(f"  - {meal.get('name', '?')} ({meal.get('category', '')}){price_text}")
+            rows.append({"name": meal.get("name", "?"), "category": meal.get("category", ""),
+                         "student": float(price) if isinstance(price, (int, float)) else None})
+        menu.append({"canteen": canteen["name"], "open": True, "meals": rows})
     status.append(f"✓ Mensa (OpenMensa): {len(canteens)} canteen(s)")
+    return menu
+
+
+def mensa_lines(menu: list[dict]) -> list[str]:
+    lines = []
+    for canteen in menu:
+        if not canteen["open"]:
+            lines.append(f"{canteen['canteen']}: closed or no menu today")
+            continue
+        lines.append(f"{canteen['canteen']}:")
+        for meal in canteen["meals"][:6]:
+            price_text = f" — €{meal['student']:.2f} students" if meal["student"] is not None else ""
+            lines.append(f"  - {meal['name']} ({meal['category']}){price_text}")
     return lines
+
+
+def mensa(cfg: dict, status: list, today: dt.date) -> list[str]:
+    return mensa_lines(mensa_menu(cfg, status, today))
 
 
 def deadlines(today: dt.date, status: list) -> list[str]:

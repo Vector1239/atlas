@@ -27,7 +27,10 @@ metadata:
    accidents and sports unless they are major. Drop duplicates of the same story.
 5. Write the message in this shape, skipping any section with nothing in it:
 
-   ☀️ **<Weekday, date>**: <weather today in one line>
+   <weather icon> **<Weekday, date>**: <weather today in one line>
+      Take the weekday from the data's header, never work it out yourself. Pick the icon from
+      today's forecast: ☀️ clear, 🌤️ mainly clear, ⛅ partly cloudy, ☁️ overcast, 🌫️ fog,
+      🌧️ rain or a rain chance of 60% or more, 🌨️ snow, ⛈️ thunderstorm.
    ⏰ **Deadlines**: <only if the DEADLINES section has items; bold the nearest>
    📍 **Trier**: 2–4 items
    🇱🇺 **Region**: 1–3 items
