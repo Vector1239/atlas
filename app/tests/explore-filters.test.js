@@ -73,3 +73,8 @@ test('one Remote preset shows the three remote boards and clears geographic and 
  assert.equal(home.workplace,'all');
  assert.equal(selectExplore({...data,jobs},home,'trier').length,jobs.length);
 });
+test('listings sharing an id still get unique keys, so no stale job card lingers when switching to Events', () => {
+ const twice={...data,jobs:[job,{...job,title:'Other role'}]};
+ const keys=selectExplore(twice,initialFilters).map(i=>i.key);
+ assert.equal(new Set(keys).size,keys.length);
+});
