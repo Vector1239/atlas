@@ -56,10 +56,12 @@ function render() {
   $('translate').classList.toggle('on', Boolean(translation.on));
   $('translate').classList.toggle('suggested', Boolean(foreign) && !translation.on);
   $('translate-label').textContent = translation.on ? 'Show original' : 'Translate';
-  $('translate').title = translation.on ? 'Show the page in its original language' : 'Translate this page to English (Microsoft Translator). Right-click for options.';
+  $('translate').title = translation.on ? 'Show the page in its original language' : 'Translate this page to English on this Mac. Right-click for options.';
   $('translate').disabled = !page.url;
-  const note = page.failure || translation.failure
-    || (translation.on ? (translation.busy ? 'Translating…' : `Translated${translation.from ? ` from ${translation.from}` : ''} by Microsoft Translator`) : '');
+  const note = page.failure || translation.failure || (!translation.on ? ''
+    : translation.downloading ? 'Downloading the translation model (one time only)…'
+    : translation.busy ? 'Translating on this Mac…'
+    : `Translated${translation.from ? ` from ${translation.from}` : ''} on this Mac`);
   $('note').textContent = document.activeElement === address ? '' : note;
   $('note').classList.toggle('failure', Boolean(page.failure || translation.failure));
 }

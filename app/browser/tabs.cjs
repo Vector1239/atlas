@@ -6,6 +6,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { isWeb, addressURL, chromeUserAgent } = require('./address.cjs');
 const { PageTranslator, isEnglish } = require('./translate.cjs');
+const { prepare: prepareTranslation } = require('./local-translator.cjs');
 
 const STRIP = 40, TOOLBAR = 40;
 const BUTTONS = { strip: { x: 16, y: 14 }, plain: { x: 19, y: 18 } };
@@ -115,6 +116,7 @@ function readLanguage(tab) {
   tab.view.webContents.executeJavaScript('document.documentElement.lang || ""', false).then(language => {
     tab.language = String(language).slice(0, 12);
     if (preferences().autoTranslate && tab.language && !isEnglish(tab.language) && !tab.translator.on) tab.translator.start();
+    else if (tab.language && !isEnglish(tab.language)) prepareTranslation(tab.language.split('-')[0].toLowerCase());
     send();
   }).catch(() => {});
 }
@@ -126,7 +128,7 @@ function openTab(url, { after = null, background = false, translate = false } = 
   const view = new WebContentsView({ webPreferences: { session: browserSession(),
     nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true } });
   const tab = { id: nextId++, view, failure: '', language: '' };
-  tab.translator = new PageTranslator(view.webContents, send);
+  tab.translator = new PageTranslator(view.webContents, send, () => tab.language);
   const index = tabs.findIndex(item => item.id === after);
   tabs.splice(index < 0 ? tabs.length : index + 1, 0, tab);
   win.contentView.addChildView(view);
