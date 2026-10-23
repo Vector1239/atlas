@@ -55,7 +55,8 @@ def ical_time(value, parameters):
     return moment, False
 
 
-def ical_rows(payload, source, source_url, today):
+def ical_rows(payload, source, source_url, today, zone=None, link_in_description=False):
+    """Read a published calendar. With zone, timed events are shown in that local time."""
     text = payload.decode('utf-8-sig') if isinstance(payload, bytes) else payload
     if 'BEGIN:VCALENDAR' not in text or 'END:VCALENDAR' not in text:
         raise ValueError('The source did not return a calendar')
@@ -77,14 +78,21 @@ def ical_rows(payload, source, source_url, today):
             end, end_all_day = ical_time(*fields.get('DTEND', fields['DTSTART']))
             if all_day and end_all_day and end > start:
                 end -= dt.timedelta(days=1)  # RFC 5545 all-day DTEND is exclusive.
+            if zone and not all_day:
+                # Expanded exports state UTC; floating times are the calendar's own local time.
+                start, end = [m.astimezone(zone) if m.tzinfo else m.replace(tzinfo=zone) for m in (start, end)]
             value = lambda key: unescape_ical(fields.get(key, ('', {}))[0])
+            link = value('URL')
+            if not link and link_in_description:
+                found = re.search(r'https?://[^\s"<>\']+', html.unescape(value('DESCRIPTION')))
+                link = found[0].rstrip('.,;)') if found else ''
             venue = plain(value('LOCATION'), 400)
             if not venue:
                 labelled = re.search(r'(?:^|\n)(?:Place|Venue|Location|Ort):\s*([^\n]+)',value('DESCRIPTION'),re.I)
                 if labelled:
                     venue = plain(re.split(r'Please note',labelled[1],maxsplit=1,flags=re.I)[0],400)
             time_note = '' if all_day else f'{start:%H:%M}–{end:%H:%M} {start.tzname() or "source local time"}'
-            item = record(value('SUMMARY'), start.isoformat(), end.isoformat(), value('URL') or source_url, source, today,
+            item = record(value('SUMMARY'), start.isoformat(), end.isoformat(), link if valid_url(link) else source_url, source, today,
                           venue=venue, description=plain(value('DESCRIPTION')),
                           time_note=time_note, starts_at=start.isoformat() if not all_day else '',
                           ends_at=end.isoformat() if not all_day else '',
@@ -92,6 +100,8 @@ def ical_rows(payload, source, source_url, today):
                           online=bool(re.fullmatch(r'(?:online|virtual|remote|zoom|webinar)(?:\s+event)?', venue, re.I)),
                           topics=[plain(t,60) for t in value('CATEGORIES').split(',') if t],
                           authority='calendar', source_url=source_url)
+            if item and 'RECURRENCE-ID' in fields:
+                item['series_id'] = plain(value('UID'), 300)  # One meeting series, many dates.
             if item:
                 result.append(item)
         except (ValueError, KeyError, TypeError):
@@ -99,25 +109,37 @@ def ical_rows(payload, source, source_url, today):
     return result
 
 
+MASCHINENDECK = {'city':'Trier', 'country':'Germany', 'source_url':'https://maschinendeck.org/',
+                 'calendar_url':'https://nextcloud.maschinendeck.org/index.php/apps/calendar/p/tCy8jLHHdX3oRWQG'}
+MASCHINENDECK_NOTE = 'Open hacker and maker community meeting. See the public calendar for participation details.'
+
+
+def maschinendeck_calendar_rows(payload, today):
+    """Maschinendeck's public Nextcloud calendar, exported with recurrences expanded."""
+    rows = ical_rows(payload, 'Maschinendeck Trier', MASCHINENDECK['source_url'], today, zone=ZoneInfo('Europe/Berlin'))
+    return [{**row, **MASCHINENDECK, 'url':MASCHINENDECK['source_url'], 'description':row['description'] or MASCHINENDECK_NOTE} for row in rows]
+
+
 def maschinendeck_rows(payload, today):
-    if not isinstance(payload, dict) or payload.get('code') != 200 or not isinstance(payload.get('data'), list):
+    events = payload.get('data') if isinstance(payload, dict) and str(payload.get('code', 200)) == '200' else payload
+    if not isinstance(events, list):
         raise ValueError('Maschinendeck did not return its public event list')
     rows = []
-    for event in payload['data']:
+    for event in events:
         try:
             start = dt.datetime.fromisoformat(event['dtstart']).astimezone(ZoneInfo('Europe/Berlin'))
             end = dt.datetime.fromisoformat(event.get('dtend') or event['dtstart']).astimezone(ZoneInfo('Europe/Berlin'))
             item = record(event.get('summary'), start.isoformat(), end.isoformat(), 'https://maschinendeck.org/', 'Maschinendeck Trier', today,
                           city='Trier', country='Germany', venue=plain(event.get('location'),400),
-                          description=plain(event.get('description')) or 'Open hacker and maker community meeting. See the public calendar for participation details.',
+                          description=plain(event.get('description')) or MASCHINENDECK_NOTE,
                           time_note=f'{start:%H:%M}–{end:%H:%M} {start.tzname()}', starts_at=start.isoformat(), ends_at=end.isoformat(),
                           series_id=plain(event.get('uid'),300),
                           cancelled=str(event.get('status','')).upper() == 'CANCELLED',
-                          source_url='https://maschinendeck.org/', authority='calendar',
-                          calendar_url='https://nextcloud.maschinendeck.org/index.php/apps/calendar/p/tCy8jLHHdX3oRWQG')
+                          source_url=MASCHINENDECK['source_url'], authority='calendar',
+                          calendar_url=MASCHINENDECK['calendar_url'])
             if item:
                 rows.append(item)
-        except (KeyError, ValueError, TypeError):
+        except (KeyError, ValueError, TypeError, AttributeError):
             continue
     return rows
 

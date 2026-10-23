@@ -35,6 +35,11 @@
       "name": "Devpost hackathons",
       "city": "Europe & online",
       "url": "https://devpost.com/hackathons"
+    },
+    {
+      "name": "Python events calendar",
+      "city": "Europe & online",
+      "url": "https://www.python.org/events/python-events/"
     }
   ],
   "events": [

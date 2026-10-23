@@ -9,6 +9,7 @@ import re
 import threading
 import unicodedata
 import urllib.parse
+from zoneinfo import ZoneInfo
 
 import discovery
 import gl_common as gl
@@ -22,12 +23,24 @@ FEEDS = [
     ('Google Developers Blog', 'https://developers.googleblog.com/feeds/posts/default?alt=rss'),
     ('Mozilla Hacks', 'https://hacks.mozilla.org/feed/'),
     ('Rust Blog', 'https://blog.rust-lang.org/feed.xml'),
+    ('Go Blog', 'https://go.dev/blog/feed.atom'),
+    ('Kubernetes Blog', 'https://kubernetes.io/feed.xml'),
+    ('JetBrains Blog', 'https://blog.jetbrains.com/feed/'),
+    ('Stack Overflow Blog', 'https://stackoverflow.blog/feed/'),
+    ('Engineering at Meta', 'https://engineering.fb.com/feed/'),
 ]
 CONFERENCES = 'https://developers.events/all-events.json'
 REFRESH_LOCK = threading.Lock()
 STATUS = {'running': False, 'error': ''}
 BASEMAP = json.loads((Path(__file__).parent / 'content/political-map.json').read_text())
-EVENT_SOURCES = ('developers.events', 'CCC calendar', 'Maschinendeck Trier', 'Silicon Luxembourg calendar', 'Major League Hacking', 'Devpost')
+# The public Google calendar behind python.org/events (Python Software Foundation).
+PYTHON_CALENDARS = {
+    'Python events calendar': ('j7gov1cmnqr9tvg14k621j7t5c@group.calendar.google.com', 'https://www.python.org/events/python-events/'),
+}
+# Worldwide listings: without a stated country an event is left out rather than guessed.
+WORLDWIDE = {'Devpost', 'Major League Hacking', *PYTHON_CALENDARS}
+EVENT_SOURCES = ('developers.events', 'CCC calendar', 'Maschinendeck Trier', 'Silicon Luxembourg calendar', 'Major League Hacking', 'Devpost', *PYTHON_CALENDARS)
+MASCHINENDECK_CALENDAR = 'https://nextcloud.maschinendeck.org/remote.php/dav/public-calendars/tCy8jLHHdX3oRWQG'
 
 
 def contains(geometry, lat, lon):
@@ -109,9 +122,11 @@ def locate_events(rows):
                 named_city, named_country = venue_location(', '.join(filter(None,[city,item.get('venue','')])),country)
                 if named_city:
                     city,country = named_city,named_country
+                elif not country:
+                    country = named_country  # A stated country still counts without a mapped city.
             if country and country not in EUROPE:
                 continue
-            if not country and item.get('source') in ('Devpost','Major League Hacking'):
+            if not country and item.get('source') in WORLDWIDE:
                 continue
             item.update(city=city or 'Location not provided',country=country or 'Country not provided',location=city_location(city,country))
         if item['kind'] == 'event':
@@ -221,6 +236,28 @@ def public_state(state_dir, today):
     return {**_PUBLIC['value'], **STATUS}
 
 
+def maschinendeck_events(today):
+    """The public calendar export first, then the space's own event API."""
+    end = today + dt.timedelta(days=90)
+    berlin = ZoneInfo('Europe/Berlin')
+    span = [int(dt.datetime.combine(day, dt.time(), berlin).timestamp()) for day in (today, end)]
+    rows, errors = None, []
+    try:
+        # Nextcloud expands the weekly meetings server-side for the requested window.
+        rows = providers.maschinendeck_calendar_rows(gl.http_get(f'{MASCHINENDECK_CALENDAR}?export&expand=1&start={span[0]}&end={span[1]}'), today)
+        if rows:
+            return rows
+    except Exception as exc:
+        errors.append('calendar export: ' + gl.short_error(exc))
+    try:
+        return providers.maschinendeck_rows(gl.http_json(f'https://nextcloud.maschinendeck.org/rest/?from={today:%Y%m%d}&to={end:%Y%m%d}'), today)
+    except Exception as exc:
+        if rows is not None:
+            return rows
+        errors.append('event API: ' + gl.short_error(exc))
+    raise ValueError('; '.join(errors))
+
+
 def fetch_event_source(name, today):
     if name == 'developers.events':
         raw = gl.http_json(CONFERENCES)
@@ -230,9 +267,11 @@ def fetch_event_source(name, today):
     if name == 'CCC calendar':
         return locate_events(providers.ical_rows(gl.http_get('https://events.ccc.de/calendar/events.ics'), name, 'https://events.ccc.de/calendar/', today))
     if name == 'Maschinendeck Trier':
-        end = today + dt.timedelta(days=90)
-        url = f'https://nextcloud.maschinendeck.org/rest/?from={today:%Y%m%d}&to={end:%Y%m%d}'
-        return locate_events(providers.maschinendeck_rows(gl.http_json(url),today))
+        return locate_events(maschinendeck_events(today))
+    if name in PYTHON_CALENDARS:
+        calendar, page = PYTHON_CALENDARS[name]
+        url = f'https://calendar.google.com/calendar/ical/{urllib.parse.quote(calendar)}/public/basic.ics'
+        return locate_events(providers.ical_rows(gl.http_get(url), name, page, today, link_in_description=True))
     if name == 'Silicon Luxembourg calendar':
         url = 'https://www.siliconluxembourg.lu/calendar/'
         rows = providers.ical_rows(gl.http_get(url+'?ical=1'),name,url,today)
@@ -295,7 +334,7 @@ def refresh(state_dir, today):
             if not result:
                 raise ValueError('No readable posts returned')
             return result
-        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
             tasks = {pool.submit(fetch_posts, name, url): name for name, url in FEEDS}
             event_tasks = {pool.submit(fetch_event_source,name,today):name for name in EVENT_SOURCES}
             for future, name in tasks.items():

@@ -74,6 +74,22 @@ class TechTests(unittest.TestCase):
             self.assertEqual(saved['event_sources']['developers.events'],[])
             self.assertEqual(saved['event_sources']['Maschinendeck Trier'],[{'id':'new-meetup'}])
 
+    def test_maschinendeck_falls_back_to_its_event_api_and_reports_both_failures(self):
+        api = {'code':200,'data':[{'summary':'Chaostreff','uid':'s','dtstart':'2026-10-20T18:00:00+00:00','dtend':'2026-10-20T21:59:00+00:00'}]}
+        with patch.object(tech.gl,'http_get',side_effect=OSError('offline')), patch.object(tech.gl,'http_json',return_value=api):
+            self.assertEqual(len(tech.maschinendeck_events(dt.date(2026,10,17))),1)
+        with patch.object(tech.gl,'http_get',side_effect=OSError('offline')), patch.object(tech.gl,'http_json',side_effect=OSError('down')):
+            with self.assertRaisesRegex(ValueError,'calendar export.*event API'):
+                tech.maschinendeck_events(dt.date(2026,10,17))
+        with patch.object(tech.gl,'http_get',return_value=b'BEGIN:VCALENDAR\nEND:VCALENDAR') as get, patch.object(tech.gl,'http_json',side_effect=OSError('down')):
+            self.assertEqual(tech.maschinendeck_events(dt.date(2026,10,17)),[])
+            self.assertIn('expand=1',get.call_args[0][0])
+
+    def test_worldwide_python_listings_need_a_european_or_online_location(self):
+        rows = [{'title':t,'kind':'event','city':'','country':'','venue':v,'source':'Python events calendar','online':v=='Online'} for t,v in
+                [('PyCon DE','Darmstadt, Germany'),('PyCon Peru','Lima, Peru'),('Mystery meetup','Somewhere'),('Python Web Conf','Online')]]
+        self.assertEqual([r['title'] for r in tech.locate_events(rows)],['PyCon DE','Python Web Conf'])
+
     def test_neighbourhood_addresses_resolve_to_a_known_city_and_global_unknowns_stay_out(self):
         rows = tech.locate_events([{'title':'Meetup','kind':'event','city':'Gare Luxembourg','country':'Luxembourg','venue':'Silversquare, Luxembourg','source':'Silicon Luxembourg calendar'}, {'title':'Hack','kind':'hackathon','city':'','country':'','venue':'Unknown international venue','source':'Devpost'}])
         self.assertEqual(len(rows),1)
