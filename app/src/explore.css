@@ -148,6 +148,8 @@
 .event-filter-selects label{margin:0;min-width:0;font-size:9px;font-weight:500;color:#777f6c;gap:5px}
 .event-filter-selects select{width:100%;padding:8px 7px;font-size:10px;border-color:#dfe4d5;color:#424f37}
 .event-filter-clear{align-self:flex-start;font-size:9px;display:flex;align-items:center;gap:4px}
+.job-filter-checks{display:flex;flex-wrap:wrap;gap:6px 16px}
+.job-filter-checks .check-label{margin:0;font-size:10px;color:#596650}
 .event-day-heading{font:600 9px/1.4 -apple-system,sans-serif;letter-spacing:1.2px;text-transform:uppercase;color:#9a7a57;padding:8px 2px 0;border-top:1px solid #ece4d8;margin-top:4px}
 .explore-result-list>.event-day-heading:first-child{border-top:0;margin-top:0;padding-top:0}
 .event-body>p.event-what{color:#5a6b4b;font-size:12px}

@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 
 from job_language import german_requirement
+import job_insights
 
 CONTENT = Path(__file__).parent / "content"
 TITLE_TRANSLATIONS = json.loads((CONTENT / "job-translations.json").read_text())
@@ -206,6 +207,8 @@ def enrich_job(job, translations=None):
             zones = legacy.group(1).split(",") if legacy else []
         result["timezone_label"], result["timezone_details"] = timezone_summary(zones)
         result["region_name"] = job.get("remote_scope") or re.split(r"\s*·\s*Timezones:", job.get("region_name", ""), flags=re.I)[0] or "Worldwide"
+    result["country_name"] = "Remote" if result["city"] == "Remote" else country
+    result["field"] = job_insights.family(result)
     result["location"] = city_location(result["city"], country)
     return result
 

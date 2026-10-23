@@ -68,6 +68,8 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(row['city'], 'Trier')
         self.assertEqual(row['region_name'], 'Rhineland-Palatinate')
         self.assertEqual(row['distance_from_trier'], 1.5)
+        self.assertEqual(row['field'], 'Data engineering')
+        self.assertEqual(row['country_name'], 'Germany')
 
     def test_unknown_distance_is_not_zero_or_distance_from_another_city(self):
         job = {'title': 'Engineer', 'where': 'Berlin', 'source': 'Arbeitnow'}

@@ -91,6 +91,23 @@ class AtlasTests(unittest.TestCase):
             self.assertEqual({job['source'] for job in b.CACHE['jobs']},{'JSearch','Bundesagentur'})
             self.assertFalse(paid.call_args.kwargs['allow_network'])
 
+    def test_refresh_gives_every_job_a_unique_id_when_short_ids_collide(self):
+        b=self.backend
+        today=b.dt.date.today().isoformat()
+        first={'source':'Arbeitnow','source_id':'tester-a','title':'Softwaretester','company':'Hallo Welt! GmbH','ring':1,
+               'where':'Regensburg','posted':today,'url':'https://jobs.example/a','text':'','flags':[]}
+        second={**first,'source_id':'analyst-b','title':'Data Analyst','url':'https://jobs.example/b'}
+        with patch.dict(b.CACHE,{'jobs':[],'news':[]}), patch.object(b,'config',return_value={'jobs':{'include':['data']}}), \
+                patch.object(b.morning_brief,'weather',return_value=[]), patch.object(b.morning_brief,'mensa_menu',return_value=[]), \
+                patch.object(b.NEWS_MEDIA,'start'), patch.object(b.job_scan,'fetch_bundesagentur',return_value=[]), \
+                patch.object(b.job_scan,'fetch_arbeitnow',return_value=[first,second]), patch.object(b.job_scan,'fetch_jsearch',return_value=[]), \
+                patch.object(b.job_scan,'fetch_remote',return_value=[]), patch.object(b.gl,'short_id',return_value='J-same'):
+            b.refresh_data()
+            ids=[job['id'] for job in b.CACHE['jobs']]
+            self.assertEqual(len(ids),2)
+            self.assertEqual(len(set(ids)),2)
+            self.assertIn('J-same',ids)
+
     def test_only_explicit_jsearch_action_authorizes_paid_refresh(self):
         b=self.backend
         cfg={'jobs':{'jsearch':{'searches':[{'what':'data'}]}}}
