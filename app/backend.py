@@ -362,13 +362,18 @@ def refresh_data(include_jsearch=False):
         with LOCK:
             jobs += [dict(job) for job in CACHE.get('jobs', []) if job.get('source') == 'JSearch'
                      and job.get('posted') and job['posted'][:10] >= cutoff]
-        found, seen = [], set()
+        found, seen, ids = [], set(), set()
         for job in sorted(jobs, key=lambda item: item["ring"]):
             key = f"{gl.norm(job['title'])}|{gl.norm(job['company'])}"
             if key in seen or not valid_url(job.get("url", "")):
                 continue
             seen.add(key)
-            job["id"] = gl.short_id(f"{job['source']}:{job['source_id']}")
+            # Five hex digits collide every few hundred jobs; a clash gets a longer id so each listing stays unique.
+            origin = f"{job['source']}:{job['source_id']}"
+            job["id"] = gl.short_id(origin)
+            if job["id"] in ids:
+                job["id"] = f"J-{hashlib.sha1(origin.encode('utf-8')).hexdigest()[:12]}"
+            ids.add(job["id"])
             job["flags"] = matcher.flags(job)
             found.append(job)
         found.sort(key=job_scan.score, reverse=True)

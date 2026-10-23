@@ -1,9 +1,11 @@
-import { selectJobs } from './job-filters.js';
+import { jobFilterView, selectJobs } from './job-filters.js';
+import { validLocation, cityDistance } from './geo.js';
+export { validLocation, cityDistance };
 import { matchesEvent } from './event-filters.js';
 
-export const initialFilters = { search: '', kind: 'all', group: 'all', distance: 'any', city: 'all', source: 'all', workplace: 'all', language: 'all', hideSenior: false, sort: 'distance', when: 'any', category: 'all', genre: 'all', country: 'all', eventSort: 'nearest' };
+export const initialFilters = { search: '', kind: 'all', group: 'all', distance: 'any', city: 'all', source: 'all', workplace: 'all', language: 'all', hideSenior: false, sort: 'distance', when: 'any', category: 'all', genre: 'all', country: 'all', eventSort: 'nearest', posted: 'any', jobCountry: 'all', jobCity: 'all', field: 'all' };
 export function filtersForScope(filters, scope) {
-  return { ...filters, city: 'all', country: 'all', distance: 'any',
+  return { ...filters, city: 'all', country: 'all', jobCity: 'all', jobCountry: 'all', distance: 'any',
     workplace: scope === 'remote' ? 'remote' : 'all',
     ...(scope === 'remote' ? { kind: 'jobs', sort: 'newest', source: 'all' } : {}) };
 }
@@ -11,16 +13,6 @@ export const placeKey = item => item.location ? `${item.location.lat},${item.loc
 export function exploreTotals(data) {
   const jobs = (data.jobs || []).length, events = (data.events?.items || []).length;
   return { jobs, events, total:jobs + events };
-}
-export function validLocation(location) {
-  return !!location && Number.isFinite(location.lat) && Number.isFinite(location.lon) && Math.abs(location.lat) <= 90 && Math.abs(location.lon) <= 180;
-}
-export function cityDistance(location) {
-  if (!validLocation(location)) return null;
-  const rad = x => x * Math.PI / 180;
-  const lat = rad(location.lat - 49.75565), lon = rad(location.lon - 6.63935);
-  const a = Math.sin(lat / 2) ** 2 + Math.cos(rad(49.75565)) * Math.cos(rad(location.lat)) * Math.sin(lon / 2) ** 2;
-  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)));
 }
 export function inBounds(location, bounds) {
   if (!validLocation(location)) return false;
@@ -39,9 +31,10 @@ export function exploreView(items, { inView = true, bounds = null, selected = nu
   return result;
 }
 const remoteSources = new Set(['Himalayas', 'Remote OK', 'Jobicy']);
+export const exploreJobs = (data, scope) => scope === 'remote' ? data.jobs.filter(job => remoteSources.has(job.source || job.source_label)) : data.jobs;
 export function selectExplore(data, filters, scope) {
-  const sourceJobs = scope === 'remote' ? data.jobs.filter(job => remoteSources.has(job.source || job.source_label)) : data.jobs;
-  const jobs = filters.kind === 'events' ? [] : selectJobs(sourceJobs, filters, data.saved_jobs).map(job => ({ ...job, kind: 'job', key: `job:${job.id}` }));
+  const sourceJobs = exploreJobs(data, scope);
+  const jobs = filters.kind === 'events' ? [] : selectJobs(sourceJobs, jobFilterView(filters), data.saved_jobs, data.date).map(job => ({ ...job, kind: 'job', key: `job:${job.id}` }));
   const events = filters.kind === 'jobs' ? [] : (data.events?.items || []).filter(event => {
     const distance = cityDistance(event.location);
     return matchesEvent(event, filters, data.date)
@@ -54,7 +47,13 @@ export function selectExplore(data, filters, scope) {
     events.sort((a, b) => near.get(place(a)) - near.get(place(b)) || place(a).localeCompare(place(b)) || a.start.localeCompare(b.start));
   } else events.sort((a, b) => a.start.localeCompare(b.start));
   // Alternate the two kinds so events don't get buried beneath a full job feed.
-  return Array.from({ length: Math.max(jobs.length, events.length) }, (_, i) => [jobs[i], events[i]]).flat().filter(Boolean);
+  // Listing keys must be unique: React keeps a stale card on screen (a job in the Events list) when two share one.
+  const used = new Map();
+  return Array.from({ length: Math.max(jobs.length, events.length) }, (_, i) => [jobs[i], events[i]]).flat().filter(Boolean).map(item => {
+    const seen = used.get(item.key) || 0;
+    used.set(item.key, seen + 1);
+    return seen ? { ...item, key: `${item.key}#${seen}` } : item;
+  });
 }
 export function groupPlaces(items) {
   const groups = new Map();
