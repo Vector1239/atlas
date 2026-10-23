@@ -270,8 +270,15 @@ def fetch_event_source(name, today):
         return locate_events(maschinendeck_events(today))
     if name in PYTHON_CALENDARS:
         calendar, page = PYTHON_CALENDARS[name]
-        url = f'https://calendar.google.com/calendar/ical/{urllib.parse.quote(calendar)}/public/basic.ics'
-        return locate_events(providers.ical_rows(gl.http_get(url), name, page, today, link_in_description=True))
+        # Google serves public calendars at both addresses; python.org's wiki lists the second.
+        for host in ('https://calendar.google.com/calendar', 'https://www.google.com/calendar'):
+            try:
+                payload = gl.http_get(f'{host}/ical/{urllib.parse.quote(calendar)}/public/basic.ics')
+                break
+            except Exception:
+                if host.startswith('https://www.'):
+                    raise
+        return locate_events(providers.ical_rows(payload, name, page, today, link_in_description=True))
     if name == 'Silicon Luxembourg calendar':
         url = 'https://www.siliconluxembourg.lu/calendar/'
         rows = providers.ical_rows(gl.http_get(url+'?ical=1'),name,url,today)
