@@ -42,6 +42,28 @@ class TechSourceTests(unittest.TestCase):
         self.assertEqual(rows[1]['time_note'],'20:00–23:59 CET')
         self.assertTrue(all(row['city']=='Trier' for row in rows))
 
+    def test_maschinendeck_calendar_export_shows_expanded_meetings_in_trier_time(self):
+        def instance(day, hour):
+            return f'BEGIN:VEVENT\nUID:chaostreff\nRECURRENCE-ID:202610{day}T{hour}0000Z\nSUMMARY:Chaostreff\nDTSTART:202610{day}T{hour}0000Z\nDTEND:202610{day}T{hour}5900Z\nEND:VEVENT\n'
+        calendar = 'BEGIN:VCALENDAR\n' + instance(20,18) + instance(27,19) + 'END:VCALENDAR'
+        rows = sources.maschinendeck_calendar_rows(calendar,TODAY)
+        self.assertEqual([row['time_note'] for row in rows],['20:00–20:59 CEST','20:00–20:59 CET'])
+        self.assertEqual([row['series_id'] for row in rows],['chaostreff','chaostreff'])
+        self.assertTrue(all(row['city']=='Trier' and row['url']=='https://maschinendeck.org/' and row['description'] for row in rows))
+        late = calendar.replace('20261027T190000Z','20261027T233000Z').replace('20261027T195900Z','20261027T235900Z')
+        self.assertEqual(sources.maschinendeck_calendar_rows(late,TODAY)[1]['start'],'2026-10-28')
+
+    def test_maschinendeck_api_also_accepts_a_bare_event_list(self):
+        event = {'summary':'Chaostreff','uid':'s','dtstart':'2026-10-20T18:00:00+00:00','dtend':'2026-10-20T21:59:00+00:00'}
+        self.assertEqual(len(sources.maschinendeck_rows([event,'junk'],TODAY)),1)
+        with self.assertRaises(ValueError):
+            sources.maschinendeck_rows({'code':503,'data':None},TODAY)
+
+    def test_calendar_without_event_url_can_link_to_the_page_named_in_its_description(self):
+        text = 'BEGIN:VCALENDAR\nBEGIN:VEVENT\nSUMMARY:PyCon DE\nDTSTART;VALUE=DATE:20270414\nDTEND;VALUE=DATE:20270417\nLOCATION:Darmstadt\\, Germany\nDESCRIPTION:<a href="https://2027.pycon.de/">PyCon DE</a>\nEND:VEVENT\nEND:VCALENDAR'
+        self.assertEqual(sources.ical_rows(text,'Python','https://www.python.org/events/',TODAY,link_in_description=True)[0]['url'],'https://2027.pycon.de/')
+        self.assertEqual(sources.ical_rows(text,'Python','https://www.python.org/events/',TODAY)[0]['url'],'https://www.python.org/events/')
+
     def test_mlh_reads_published_microdata_not_location_name_as_event_title(self):
         markup = '''<a itemScope itemType="https://schema.org/Event" href="https://hack.example/?tracking=1"><meta itemProp="url" content="https://hack.example/"><meta itemProp="startDate" content="2026-11-13T12:00:00Z"><meta itemProp="endDate" content="2026-11-15T18:00:00Z"><meta itemProp="isAccessibleForFree" content="true"><div itemProp="location"><span itemProp="name">London</span><meta itemProp="addressLocality" content="London"><meta itemProp="addressCountry" content="GB"></div><h4>University Hackathon</h4></a>'''
         row = sources.mlh_rows(markup,'https://www.mlh.com/seasons/2027/events',TODAY)[0]
