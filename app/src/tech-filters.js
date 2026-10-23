@@ -7,6 +7,8 @@ export function distanceFrom(location, base) {
   const a = Math.sin(rad(location.lat - base.lat) / 2) ** 2 + Math.cos(rad(base.lat)) * Math.cos(rad(location.lat)) * Math.sin(rad(location.lon - base.lon) / 2) ** 2;
   return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)));
 }
+// Events that began earlier but are still running sort as today, not by their old start.
+const sortDate = (item, today) => item.start < today ? today : item.start;
 export function selectTech(tech, filters, home, today) {
   const cutoff = new Date(`${today}T00:00:00Z`); cutoff.setUTCDate(cutoff.getUTCDate() + Number(filters.period));
   return (tech.events || []).map(item => ({ ...item, distance: item.online ? null : distanceFrom(item.location, home) })).filter(item =>
@@ -17,7 +19,7 @@ export function selectTech(tech, filters, home, today) {
     && (filters.distance === 'any' || item.distance !== null && item.distance <= Number(filters.distance))
     && (filters.city === 'all' || item.city === filters.city)
     && (filters.period === 'all' || item.start <= cutoff.toISOString().slice(0,10)))
-    .sort((a,b) => (filters.sort === 'nearest' ? (a.distance ?? Infinity) - (b.distance ?? Infinity) : 0) || a.start.localeCompare(b.start) || a.title.localeCompare(b.title));
+    .sort((a,b) => (filters.sort === 'nearest' ? (a.distance ?? Infinity) - (b.distance ?? Infinity) : 0) || sortDate(a, today).localeCompare(sortDate(b, today)) || a.title.localeCompare(b.title));
 }
 
 const normalized = value => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
