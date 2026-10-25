@@ -1,6 +1,6 @@
 import { validLocation } from './explore-filters.js';
 
-export const initialTechFilters = { kind:'all', search:'', area:'all', distance:'any', city:'all', period:'all', source:'all', sort:'nearest' };
+export const initialTechFilters = { kind:'all', search:'', area:'all', distance:'any', city:'all', period:'all', source:'all', sort:'date' };
 export function distanceFrom(location, base) {
   if (!validLocation(location) || !validLocation(base)) return null;
   const rad = v => v * Math.PI / 180;

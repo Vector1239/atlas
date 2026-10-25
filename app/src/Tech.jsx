@@ -54,7 +54,7 @@ export default function Tech({ data, act, ask }) {
       <label>Where<select value={filters.area} onChange={e => set('area',e.target.value)}><option value="all">Europe & online</option><option value="germany">Germany</option><option value="europe">Europe · in person</option><option value="online">Online</option></select></label>
       <label>Event city<select value={filters.city} onChange={e => set('city',e.target.value)}><option value="all">Any city</option>{[...new Set((tech.events || []).filter(item => !item.online).map(item => item.city))].sort().map(city => <option key={city}>{city}</option>)}</select></label>
       <label>When<select value={filters.period} onChange={e => set('period',e.target.value)}><option value="all">All upcoming dates</option><option value="7">Next 7 days</option><option value="30">Next 30 days</option><option value="90">Next 3 months</option></select></label>
-      <label>Order<select value={filters.sort} onChange={e => set('sort',e.target.value)}><option value="nearest">Nearest first</option><option value="date">Soonest first</option></select></label>
+      <label>Order<select value={filters.sort} onChange={e => set('sort',e.target.value)}><option value="date">Soonest first</option><option value="nearest">Nearest first</option></select></label>
     </section></div><footer className="news-drawer-footer"><button className="text-button" onClick={() => { setFilters(initialTechFilters); setBaseCity(''); }}>Reset filters</button><button className="button" onClick={close}>Show results</button></footer></div></dialog>
   </div>;
 }
