@@ -72,3 +72,8 @@ test('events that started earlier but are still running sort as today, not by th
   const today = { title:'Today talk',id:'today',kind:'event',online:true,start:'2026-10-17',end:'2026-10-17' };
   assert.deepEqual(selectTech({events:[tomorrow,today,running]},{...initialTechFilters,sort:'date'},home,'2026-10-17').map(r => r.id),['running','today','tomorrow']);
 });
+
+test('the Tech tab opens sorted by date, soonest first, regardless of distance', () => {
+  assert.equal(initialTechFilters.sort,'date');
+  assert.deepEqual(selectTech(tech,initialTechFilters,home,'2026-10-17').map(r => r.id),['near','online','unknown','hack']);
+});
