@@ -15,6 +15,8 @@ import EventSources from './EventSources.jsx';
 import { exploreTotals } from './explore-filters.js';
 import { niceDate, safeLink } from './format.js';
 import './discovery.css';
+import { installPaper } from './paper.js';
+import './paper.css';
 
 const nav = [['today', 'Today', HouseIcon], ['news', 'News', FileTextIcon], ['explore', 'Explore', MapPinIcon], ['market', 'Job market', ChartBarIcon], ['tech', 'Tech', CodeIcon], ['admin', 'Life admin', CalendarBlankIcon], ['chat', 'Ask Atlas', ChatCircleDotsIcon], ['settings', 'Settings', GearSixIcon]];
 const when = date => date ? niceDate(date, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Not yet';
@@ -116,4 +118,5 @@ function Settings({ data, act, setNotice, stopModel, stoppingModel }) {
   </>;
 }
 
+installPaper();
 createRoot(document.getElementById('root')).render(<App />);
