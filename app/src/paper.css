@@ -1,9 +1,9 @@
 /* Watercolour paper across the app. paper.js paints the textures into these variables;
    without them (very old engine, tests) everything falls back to the flat cream colours. */
-:root{--paper:#faf8f2;--sheet:#fffdf8;--sheet-line:#ebe5d6;--sheet-shadow:0 1px 0 #6b5a3208,0 10px 24px -18px #6b5a3247;--line:#ebe5d6}
+:root{--paper:#faf8f2;--sheet:#fcf8ee;--sheet-line:#ebe5d6;--sheet-shadow:0 1px 0 #6b5a3208,0 10px 24px -18px #6b5a3247;--line:#ebe5d6}
 body{background-color:var(--paper);background-image:var(--paper-grain,none)}
 .app-shell{position:relative;isolation:isolate}
-.app-shell::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:var(--paper-backdrop,none) center/100% 100% no-repeat;mix-blend-mode:multiply;opacity:.75}
+.app-shell::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:var(--paper-backdrop,none) center/100% 100% no-repeat;mix-blend-mode:multiply;opacity:.55}
 .main{background:transparent}
 .topbar{border-bottom-color:var(--sheet-line)}
 
@@ -19,11 +19,11 @@ body{background-color:var(--paper);background-image:var(--paper-grain,none)}
 .engine-card small,.user small{font-size:11px;color:#8b8878}
 
 /* Every card-like surface is a sheet: warm white, grain, a soft lifted shadow and, on
-   some, a faint stain in one corner. */
+   some, a faint gold stain in one corner. */
 .card,.tile,.glance,.capture,.job-card,.market-tile,.explore-listing,.composer,.modal,.suggestions button,.profile-nudge,.hero-weather{
   background-color:var(--sheet);border-color:var(--sheet-line);box-shadow:var(--sheet-shadow);
   background-image:var(--stain,none),var(--paper-grain,none);background-repeat:no-repeat,repeat;background-size:var(--stain-size,240px) auto,180px 180px;background-position:var(--stain-at,right -70px top -80px),0 0;background-blend-mode:multiply,normal}
-.hero-weather{background-color:#fffdf8cc}
+.hero-weather{background-color:#fcf8eecc}
 .profile-nudge{background-color:#f5f0e2}
 .bento>.tile:nth-child(6n+1),.card:nth-of-type(4n+1){--stain:var(--stain-1);--stain-at:right -120px top -130px}
 .bento>.tile:nth-child(6n+2){--stain:var(--stain-2);--stain-at:right -60px bottom -70px;--stain-size:200px}
