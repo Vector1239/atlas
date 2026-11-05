@@ -1,29 +1,30 @@
 /* Watercolour paper across the app. paper.js paints the textures into these variables;
    without them (very old engine, tests) everything falls back to the flat cream colours. */
-:root{--paper:#faf8f2;--sheet:#fffdf8;--sheet-line:#ebe5d6;--sheet-shadow:0 1px 0 #6b5a3208,0 10px 24px -18px #6b5a3247;--line:#ebe5d6}
-body{background-color:var(--paper);background-image:var(--paper-grain,none)}
+:root{--paper:#f3ead7;--sheet:#fcf8ee;--sheet-line:#ebe5d6;--sheet-shadow:0 1px 0 #6b5a3208,0 10px 24px -18px #6b5a3247;--line:#ebe5d6}
+html,body{background-color:var(--paper)}
+body{background-image:var(--paper-grain,none)}
 .app-shell{position:relative;isolation:isolate}
-.app-shell::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:var(--paper-backdrop,none) center/100% 100% no-repeat;mix-blend-mode:multiply;opacity:.75}
+.app-shell::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:var(--paper-backdrop,none) center/100% 100% no-repeat;mix-blend-mode:multiply;opacity:.55}
 .main{background:transparent}
 .topbar{border-bottom-color:var(--sheet-line)}
 
 /* Sidebar: a slightly deeper sheet of the same paper. */
-.sidebar{background-color:#f6f2e8e6;background-image:var(--paper-grain,none);border-right-color:var(--sheet-line);backdrop-filter:blur(2px)}
+.sidebar{background-color:#eee4cee6;background-image:var(--paper-grain,none);border-right-color:var(--sheet-line);backdrop-filter:blur(2px)}
 .sidebar-note{display:none}
 .nav-item{font-size:14px;color:#62665c}
-.nav-item.selected{background:#ece6d6;color:#2f342c}
-.nav-item:hover{background:#f0ebdf}
+.nav-item.selected{background:#e4d8bc;color:#2f342c}
+.nav-item:hover{background:#e9dfc8}
 .workspace-label{font-size:10px;color:#8e8a78}
 .engine-card,.user{border-top-color:var(--sheet-line)}
 .engine-card strong,.user strong{font-size:12px}
 .engine-card small,.user small{font-size:11px;color:#8b8878}
 
 /* Every card-like surface is a sheet: warm white, grain, a soft lifted shadow and, on
-   some, a faint stain in one corner. */
+   some, a faint gold stain in one corner. */
 .card,.tile,.glance,.capture,.job-card,.market-tile,.explore-listing,.composer,.modal,.suggestions button,.profile-nudge,.hero-weather{
   background-color:var(--sheet);border-color:var(--sheet-line);box-shadow:var(--sheet-shadow);
   background-image:var(--stain,none),var(--paper-grain,none);background-repeat:no-repeat,repeat;background-size:var(--stain-size,240px) auto,180px 180px;background-position:var(--stain-at,right -70px top -80px),0 0;background-blend-mode:multiply,normal}
-.hero-weather{background-color:#fffdf8cc}
+.hero-weather{background-color:#fcf8eecc}
 .profile-nudge{background-color:#f5f0e2}
 .bento>.tile:nth-child(6n+1),.card:nth-of-type(4n+1){--stain:var(--stain-1);--stain-at:right -120px top -130px}
 .bento>.tile:nth-child(6n+2){--stain:var(--stain-2);--stain-at:right -60px bottom -70px;--stain-size:200px}
@@ -60,4 +61,11 @@ body{background-color:var(--paper);background-image:var(--paper-grain,none)}
 .message .markdown{font-size:14px}.composer textarea{font-size:14px}.suggestions button{font-size:13px}
 .chat-welcome p{font-size:14px}
 
-@media(prefers-reduced-transparency:reduce){.sidebar{backdrop-filter:none;background-color:#f6f2e8}}
+/* Controls that sat on the page in plain white now take the warm cream too. */
+.button.secondary,select,input.search,.explore-toolbar select,.explore-toolbar-top .search,.explore-toolbar,.tech-details dl,textarea.profile-editor,.hero-refresh{background-color:#fcf8ee}
+.button.secondary,select,input.search,.explore-toolbar select{border-color:#e4dcc8}
+.story-image-unavailable{background:#ece3cf;color:#a69a7c}
+.map-panel,.map-home-button,.map-detail-button{background-color:#fcf8ee}
+.map-panel .leaflet-container{background:#f7f0e1}
+
+@media(prefers-reduced-transparency:reduce){.sidebar{backdrop-filter:none;background-color:#eee4ce}}
