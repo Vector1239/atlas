@@ -61,7 +61,7 @@ export default function DiscoveryMap({ groups, selected, onSelect, onBounds, onH
     fetch(basemapURL,{signal:controller.signal}).then(response=>{if(!response.ok)throw Error('Map unavailable');return response.json();}).then(data=>{
       if(controller.signal.aborted)return; geography.current=data;
       const cities=mapCities(data.cities,places);
-      countryFill=L.geoJSON(data.countries,{pane:'countries',interactive:false,style:feature=>({stroke:false,fillColor:feature.properties.code==='DEU'?'#eff1e9':'#f8f8f4',fillOpacity:1})}).addTo(instance);
+      countryFill=L.geoJSON(data.countries,{pane:'countries',interactive:false,style:feature=>({stroke:false,fillColor:feature.properties.code==='DEU'?'#efe6d2':'#f8f2e4',fillOpacity:1})}).addTo(instance);
       stateLines=L.geoJSON(data.states,{pane:'states',interactive:false,style:{color:'#96a58d',weight:1.25,opacity:.95,dashArray:'4 4',fill:false}}).addTo(instance);
       countryLines=L.geoJSON(data.countries,{pane:'countryBorders',interactive:false,style:{color:'#7a8b84',weight:1.7,opacity:.9,fill:false}}).addTo(instance);
       refreshLabels.current=()=>{
